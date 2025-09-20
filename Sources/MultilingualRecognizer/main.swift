@@ -2,7 +2,7 @@ import Foundation
 @preconcurrency import Speech
 @preconcurrency import AVFoundation
 
-print("🌍 Multilingual Recognizer - English & French with Automatic Language Detection")
+// MARK: - Speech Recognition
 
 @available(macOS 26.0, *)
 class ProductionMultilingualRecognizer {
@@ -16,26 +16,16 @@ class ProductionMultilingualRecognizer {
 
     private var recognitionTasks: [Task<(), Never>] = []
     private var converter = BufferConverter()
+    private let ui: UserInterface
 
     var analyzerFormat: AVAudioFormat?
 
-    init() {}
-
-    // Pure static function to format and display recognition results
-    private static func displayResult(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, flag: String) {
-        if isFinal {
-            // Clear the line and print final result permanently with timing
-            print("\r\u{001B}[2K✅ \(flag) FINAL: \(text) [\(String(format: "%.1f", startTime))s-\(String(format: "%.1f", startTime + duration))s, \(alternativeCount) alt]")
-            fflush(stdout)
-        } else {
-            // Overwrite current line for partial results with timing
-            print("\r⏳ \(flag) PARTIAL: \(text) [\(String(format: "%.1f", startTime))s]", terminator: "")
-            fflush(stdout)
-        }
+    init(ui: UserInterface) {
+        self.ui = ui
     }
 
     func setUpMultilingualTranscriber() async throws {
-        print("🔧 Setting up multilingual transcribers...")
+        ui.status("🔧 Setting up multilingual transcribers...")
 
         // Create English transcriber
         englishTranscriber = SpeechTranscriber(
@@ -57,16 +47,16 @@ class ProductionMultilingualRecognizer {
             throw NSError(domain: "TranscriptionError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to setup transcribers"])
         }
 
-        print("✅ English transcriber created (en-US)")
-        print("✅ French transcriber created (fr-FR)")
+        ui.status("✅ English transcriber created (en-US)")
+        ui.status("✅ French transcriber created (fr-FR)")
 
         // Create SpeechAnalyzer with both transcribers for automatic language detection
         analyzer = SpeechAnalyzer(modules: [englishTranscriber, frenchTranscriber])
-        print("✅ SpeechAnalyzer created with multilingual support")
+        ui.status("✅ SpeechAnalyzer created with multilingual support")
 
         // Get the best audio format for both transcribers
         self.analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [englishTranscriber, frenchTranscriber])
-        print("🎤 Optimal audio format: \(analyzerFormat?.description ?? "Unknown")")
+        ui.status("🎤 Optimal audio format: \(analyzerFormat?.description ?? "Unknown")")
 
         // Create input stream
         (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
@@ -80,17 +70,17 @@ class ProductionMultilingualRecognizer {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
-                    ProductionMultilingualRecognizer.displayResult(
+                    self.ui.displayResult(
                         text: text,
                         isFinal: result.isFinal,
                         startTime: startTime,
                         duration: duration,
                         alternativeCount: result.alternatives.count,
-                        flag: "🇺🇸"
+                        locale: "en-US"
                     )
                 }
             } catch {
-                print("❌ English recognition failed: \(error)")
+                self.ui.status("❌ English recognition failed: \(error)")
             }
         }
 
@@ -100,17 +90,17 @@ class ProductionMultilingualRecognizer {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
-                    ProductionMultilingualRecognizer.displayResult(
+                    self.ui.displayResult(
                         text: text,
                         isFinal: result.isFinal,
                         startTime: startTime,
                         duration: duration,
                         alternativeCount: result.alternatives.count,
-                        flag: "🇫🇷"
+                        locale: "fr-FR"
                     )
                 }
             } catch {
-                print("❌ French recognition failed: \(error)")
+                self.ui.status("❌ French recognition failed: \(error)")
             }
         }
 
@@ -118,8 +108,8 @@ class ProductionMultilingualRecognizer {
 
         // Start the analyzer with the input sequence
         try await analyzer?.start(inputSequence: inputSequence)
-        print("🎯 Multilingual SpeechAnalyzer started successfully!")
-        print("💡 Automatic language detection between English and French enabled")
+        ui.status("🎯 Multilingual SpeechAnalyzer started successfully!")
+        ui.status("💡 Automatic language detection between English and French enabled")
     }
 
 
@@ -146,7 +136,7 @@ class ProductionMultilingualRecognizer {
         }
         recognitionTasks.removeAll()
 
-        print("🛑 Multilingual transcription finished")
+        ui.status("🛑 Multilingual transcription finished")
     }
 
 }
@@ -185,7 +175,9 @@ class BufferConverter {
 
 @available(macOS 26.0, *)
 func main() async {
-    print("📱 Platform: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
+    let ui: UserInterface = TerminalUI()
+    ui.status("🌍 Multilingual Recognizer - English & French with Automatic Language Detection")
+    ui.status("📱 Platform: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
 
     // Request permissions
     let speechAuth = await withCheckedContinuation { continuation in
@@ -195,7 +187,7 @@ func main() async {
     }
 
     guard speechAuth == .authorized else {
-        print("❌ Speech recognition not authorized")
+        ui.status("❌ Speech recognition not authorized")
         return
     }
 
@@ -206,15 +198,15 @@ func main() async {
     }
 
     guard micPermission else {
-        print("❌ Microphone permission denied")
+        ui.status("❌ Microphone permission denied")
         return
     }
 
-    print("✅ Permissions granted")
+    ui.status("✅ Permissions granted")
 
     do {
         // Create multilingual recognizer
-        let recognizer = ProductionMultilingualRecognizer()
+        let recognizer = ProductionMultilingualRecognizer(ui: ui)
 
         // Set up SpeechAnalyzer with multiple languages
         try await recognizer.setUpMultilingualTranscriber()
@@ -223,7 +215,7 @@ func main() async {
         let audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        print("🎤 Audio input: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount) channels")
+        ui.status("🎤 Audio input: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount) channels")
 
         // Install audio tap
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { [recognizer] buffer, _ in
@@ -231,20 +223,24 @@ func main() async {
                 do {
                     try await recognizer.streamAudioToTranscriber(buffer)
                 } catch {
-                    print("❌ Error streaming audio: \(error)")
+                    Task { @MainActor in
+                        ui.status("❌ Error streaming audio: \(error)")
+                    }
                 }
             }
         }
 
         // Start audio engine
         try audioEngine.start()
-        print("🎙️ Multilingual recognition active... (Ctrl+C to stop)")
-        print("🗣️  Try speaking in English or French - both streams will show results!")
-        print("📊 Both recognizers running in parallel with confidence measurements")
+        ui.status("🎙️ Multilingual recognition active... (Ctrl+C to stop)")
+        ui.status("🗣️  Try speaking in English or French - both streams will show results!")
+        ui.status("📊 Both recognizers running in parallel with confidence measurements")
 
         // Status updates every 30 seconds
         let statusTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
-            print("\n📊 Status: Both English and French recognizers running")
+            Task { @MainActor in
+                ui.status("\n📊 Status: Both English and French recognizers running")
+            }
         }
 
         // Keep running indefinitely
@@ -257,7 +253,7 @@ func main() async {
         try await recognizer.finishTranscribing()
 
     } catch {
-        print("❌ Error: \(error)")
+        ui.status("❌ Error: \(error)")
     }
 }
 
