@@ -21,6 +21,19 @@ class ProductionMultilingualRecognizer {
 
     init() {}
 
+    // Pure static function to format and display recognition results
+    private static func displayResult(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, flag: String) {
+        if isFinal {
+            // Clear the line and print final result permanently with timing
+            print("\r\u{001B}[2K✅ \(flag) FINAL: \(text) [\(String(format: "%.1f", startTime))s-\(String(format: "%.1f", startTime + duration))s, \(alternativeCount) alt]")
+            fflush(stdout)
+        } else {
+            // Overwrite current line for partial results with timing
+            print("\r⏳ \(flag) PARTIAL: \(text) [\(String(format: "%.1f", startTime))s]", terminator: "")
+            fflush(stdout)
+        }
+    }
+
     func setUpMultilingualTranscriber() async throws {
         print("🔧 Setting up multilingual transcribers...")
 
@@ -64,12 +77,17 @@ class ProductionMultilingualRecognizer {
         let englishTask = Task {
             do {
                 for try await case let result in englishTranscriber.results {
-                    let text = String(result.text.characters) // Extract plain string from AttributedString
-                    if result.isFinal {
-                        print("✅ 🇺🇸 FINAL: \(text)")
-                    } else {
-                        print("⏳ 🇺🇸 PARTIAL: \(text)")
-                    }
+                    let text = String(result.text.characters)
+                    let startTime = CMTimeGetSeconds(result.range.start)
+                    let duration = CMTimeGetSeconds(result.range.duration)
+                    ProductionMultilingualRecognizer.displayResult(
+                        text: text,
+                        isFinal: result.isFinal,
+                        startTime: startTime,
+                        duration: duration,
+                        alternativeCount: result.alternatives.count,
+                        flag: "🇺🇸"
+                    )
                 }
             } catch {
                 print("❌ English recognition failed: \(error)")
@@ -79,12 +97,17 @@ class ProductionMultilingualRecognizer {
         let frenchTask = Task {
             do {
                 for try await case let result in frenchTranscriber.results {
-                    let text = String(result.text.characters) // Extract plain string from AttributedString
-                    if result.isFinal {
-                        print("✅ 🇫🇷 FINAL: \(text)")
-                    } else {
-                        print("⏳ 🇫🇷 PARTIAL: \(text)")
-                    }
+                    let text = String(result.text.characters)
+                    let startTime = CMTimeGetSeconds(result.range.start)
+                    let duration = CMTimeGetSeconds(result.range.duration)
+                    ProductionMultilingualRecognizer.displayResult(
+                        text: text,
+                        isFinal: result.isFinal,
+                        startTime: startTime,
+                        duration: duration,
+                        alternativeCount: result.alternatives.count,
+                        flag: "🇫🇷"
+                    )
                 }
             } catch {
                 print("❌ French recognition failed: \(error)")
