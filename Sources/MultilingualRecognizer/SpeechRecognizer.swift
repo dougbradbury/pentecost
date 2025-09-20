@@ -17,11 +17,13 @@ final class ProductionMultilingualRecognizer: @unchecked Sendable {
     private var recognitionTasks: [Task<(), Never>] = []
     private var converter = BufferConverter()
     private let ui: UserInterface
+    private let speechProcessor: SpeechProcessor
 
     var analyzerFormat: AVAudioFormat?
 
-    init(ui: UserInterface) {
+    init(ui: UserInterface, speechProcessor: SpeechProcessor) {
         self.ui = ui
+        self.speechProcessor = speechProcessor
     }
 
     func setUpMultilingualTranscriber() async throws {
@@ -65,13 +67,14 @@ final class ProductionMultilingualRecognizer: @unchecked Sendable {
 
         // Start recognition tasks for both languages - process results directly
         let ui = self.ui
+        let processor = self.speechProcessor
         let englishTask = Task { @Sendable in
             do {
                 for try await case let result in englishTranscriber.results {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
-                    ui.displayResult(
+                    await processor.process(
                         text: text,
                         isFinal: result.isFinal,
                         startTime: startTime,
@@ -91,7 +94,7 @@ final class ProductionMultilingualRecognizer: @unchecked Sendable {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
-                    ui.displayResult(
+                    await processor.process(
                         text: text,
                         isFinal: result.isFinal,
                         startTime: startTime,

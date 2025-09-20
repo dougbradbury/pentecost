@@ -36,8 +36,11 @@ func main() async {
     ui.status("✅ Permissions granted")
 
     do {
+        // Create speech processor for display
+        let displayProcessor = DisplayProcessor()
+
         // Create multilingual recognizer
-        let recognizer = ProductionMultilingualRecognizer(ui: ui)
+        let recognizer = ProductionMultilingualRecognizer(ui: ui, speechProcessor: displayProcessor)
 
         // Set up SpeechAnalyzer with multiple languages
         try await recognizer.setUpMultilingualTranscriber()
