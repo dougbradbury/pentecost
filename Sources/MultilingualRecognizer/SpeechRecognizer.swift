@@ -5,7 +5,7 @@ import Foundation
 // MARK: - Speech Recognition
 
 @available(macOS 26.0, *)
-class ProductionMultilingualRecognizer {
+final class ProductionMultilingualRecognizer: @unchecked Sendable {
     private var inputSequence: AsyncStream<AnalyzerInput>?
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
 
@@ -64,13 +64,14 @@ class ProductionMultilingualRecognizer {
         guard let inputSequence else { return }
 
         // Start recognition tasks for both languages - process results directly
-        let englishTask = Task {
+        let ui = self.ui
+        let englishTask = Task { @Sendable in
             do {
                 for try await case let result in englishTranscriber.results {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
-                    self.ui.displayResult(
+                    ui.displayResult(
                         text: text,
                         isFinal: result.isFinal,
                         startTime: startTime,
@@ -80,17 +81,17 @@ class ProductionMultilingualRecognizer {
                     )
                 }
             } catch {
-                self.ui.status("❌ English recognition failed: \(error)")
+                ui.status("❌ English recognition failed: \(error)")
             }
         }
 
-        let frenchTask = Task {
+        let frenchTask = Task { @Sendable in
             do {
                 for try await case let result in frenchTranscriber.results {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
-                    self.ui.displayResult(
+                    ui.displayResult(
                         text: text,
                         isFinal: result.isFinal,
                         startTime: startTime,
@@ -100,7 +101,7 @@ class ProductionMultilingualRecognizer {
                     )
                 }
             } catch {
-                self.ui.status("❌ French recognition failed: \(error)")
+                ui.status("❌ French recognition failed: \(error)")
             }
         }
 
@@ -143,7 +144,7 @@ class ProductionMultilingualRecognizer {
 
 // Enhanced buffer converter with error handling
 @available(macOS 26.0, *)
-class BufferConverter {
+final class BufferConverter: Sendable {
     func convertBuffer(_ buffer: AVAudioPCMBuffer, to format: AVAudioFormat) throws -> AVAudioPCMBuffer {
         // If formats are the same, return original buffer
         if buffer.format.isEqual(format) {
