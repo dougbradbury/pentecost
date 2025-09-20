@@ -117,13 +117,37 @@ RealTimeTranslatorApp/
     └── SpeechAnalyzer _ Apple Developer Documentation.html
 ```
 
-## Future Considerations
+## Development Roadmap: Advanced Meeting Transcription System
 
-- Add confidence scoring display if needed
-- Implement audio input device selection
-- Add recording capabilities
-- Consider expanding to additional languages
-- Add UI interface beyond console output
+The project is evolving from a basic multilingual speech recognizer into a comprehensive meeting transcription and translation system.
+
+### Phase 1: Translation & Real-time Features
+1. **Real-time translation** - Translate transcribed text between English ↔ French as it's recognized
+2. **Live transcript saving** - Append each finalized line to meeting transcript file with timestamps
+3. **Translation API research** - Investigate Apple Translation API or integrate third-party translation service
+
+### Phase 2: Audio Management
+4. **Audio channel selection** - Build UI for choosing input sources (microphone, system audio, etc.)
+5. **Local mic recording** - Save microphone input to audio file during meetings
+6. **System audio capture** - Record remote participant audio output channel for complete meeting archive
+
+### Phase 3: Session & Output Management
+7. **Meeting session controls** - Add start/stop/pause functionality for recording & transcription
+8. **Transcript file format** - Implement structured format with timestamps, speaker identification, and language detection
+9. **Meeting summary generator** - Create AI-powered content summarization from transcribed content
+10. **Bilingual summaries** - Generate meeting summaries in both English and French
+
+### Technical Implementation Notes
+- Current foundation: Parallel English/French recognition with terminal overwriting and timing display
+- Centralized output formatting via pure static function for easy extension
+- Git repository initialized with proper .gitignore for Swift projects
+
+## Previous Future Considerations (Completed/Superseded)
+- ✅ Add confidence scoring display - superseded by translation focus
+- 🔄 Implement audio input device selection - moved to Phase 2
+- 🔄 Add recording capabilities - expanded in Phase 2
+- ✅ Consider expanding to additional languages - focusing on EN/FR translation first
+- 🔄 Add UI interface beyond console output - deferred for audio management priority
 
 ## Reference Documentation
 
