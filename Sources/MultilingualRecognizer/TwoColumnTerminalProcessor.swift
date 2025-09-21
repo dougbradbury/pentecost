@@ -32,7 +32,12 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
 
     private func updateEnglishColumn(_ text: String, isFinal: Bool) async {
         if isFinal {
-            englishLines.append(text)
+            // Replace the last partial result if it exists, otherwise append
+            if !englishLines.isEmpty && englishLines.last?.contains("⏳") == true {
+                englishLines[englishLines.count - 1] = text
+            } else {
+                englishLines.append(text)
+            }
         } else {
             // Update the last line for partial results
             if !englishLines.isEmpty && englishLines.last?.contains("⏳") == true {
@@ -46,7 +51,12 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
 
     private func updateFrenchColumn(_ text: String, isFinal: Bool) async {
         if isFinal {
-            frenchLines.append(text)
+            // Replace the last partial result if it exists, otherwise append
+            if !frenchLines.isEmpty && frenchLines.last?.contains("⏳") == true {
+                frenchLines[frenchLines.count - 1] = text
+            } else {
+                frenchLines.append(text)
+            }
         } else {
             // Update the last line for partial results
             if !frenchLines.isEmpty && frenchLines.last?.contains("⏳") == true {
