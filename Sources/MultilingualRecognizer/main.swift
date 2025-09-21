@@ -5,7 +5,7 @@ import Foundation
 // MARK: - App Entry Point
 
 @available(macOS 26.0, *)
-func setupRecognition(ui: UserInterface, speechProcessor: SpeechProcessor) async -> (ProductionMultilingualRecognizer, AVAudioEngine)? {
+func setupRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, audioService: AudioEngineService) async -> (ProductionMultilingualRecognizer, AVAudioEngine)? {
     ui.status("🌍 Multilingual Recognizer - English & French with Automatic Language Detection")
     ui.status("📱 Platform: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
 
@@ -41,7 +41,7 @@ func setupRecognition(ui: UserInterface, speechProcessor: SpeechProcessor) async
         // Set up SpeechAnalyzer with multiple languages
         try await recognizer.setUpMultilingualTranscriber()
 
-        // Set up audio engine
+        // Set up audio engine (using default system configuration)
         let audioEngine = AVAudioEngine()
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
@@ -82,8 +82,20 @@ func main() async {
     let translationProcessor = TranslationProcessor(nextProcessor: terminalProcessor)
     let languageFilter = LanguageFilterProcessor(nextProcessor: translationProcessor)
 
+    // Create audio service and setup UI
+    let audioService = AudioEngineService()
+    let audioSetupUI = AudioSetupUI(audioService: audioService)
+
+    // Run device selection
+    do {
+        try await audioSetupUI.runDeviceSelection()
+    } catch {
+        ui.status("❌ Audio setup failed: \(error)")
+        return
+    }
+
     // Set up recognition
-    guard let (recognizer, audioEngine) = await setupRecognition(ui: ui, speechProcessor: languageFilter) else {
+    guard let (recognizer, audioEngine) = await setupRecognition(ui: ui, speechProcessor: languageFilter, audioService: audioService) else {
         return
     }
 
