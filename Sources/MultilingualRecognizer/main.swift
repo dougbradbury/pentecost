@@ -1,6 +1,7 @@
 import Foundation
 @preconcurrency import Speech
 @preconcurrency import AVFoundation
+import CoreAudio
 
 // MARK: - App Entry Point
 
@@ -41,8 +42,33 @@ func setupRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, audio
         // Set up SpeechAnalyzer with multiple languages
         try await recognizer.setUpMultilingualTranscriber()
 
-        // Set up audio engine (using default system configuration)
+        // Set up audio engine with selected input device
         let audioEngine = AVAudioEngine()
+
+        // Apply selected input device if one was chosen
+        if let selectedInputDevice = audioService.getCurrentInputDevice() {
+            let inputNode = audioEngine.inputNode
+            guard let inputUnit = inputNode.audioUnit else {
+                throw NSError(domain: "AudioError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot access audio unit"])
+            }
+
+            var deviceID = selectedInputDevice.deviceID
+            let status = AudioUnitSetProperty(
+                inputUnit,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &deviceID,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+
+            if status == noErr {
+                ui.status("✅ Using selected input device: \(selectedInputDevice.name)")
+            } else {
+                ui.status("⚠️  Failed to set input device, using default")
+            }
+        }
+
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         ui.status("🎤 Audio input: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount) channels")
