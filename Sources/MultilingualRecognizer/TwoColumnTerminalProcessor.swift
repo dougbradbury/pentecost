@@ -9,35 +9,29 @@ struct SpeechMessage {
 
     func formatForColumn(width: Int) -> [String] {
         let timestamp = String(format: "%5.1f", startTime)
-
-        // Color codes for status indication
-        let brightWhite = "\u{001B}[97m"  // Bright white for final
-        let dimGray = "\u{001B}[90m"      // Dim gray for pending
-        let reset = "\u{001B}[0m"         // Reset color
-
-        let colorCode = isFinal ? brightWhite : dimGray
-        let prefix = "\(timestamp)s "
+        let statusEmoji = isFinal ? "x" : "?"
+        let prefix = "\(timestamp)s \(statusEmoji) "
 
         // Calculate the exact prefix length for proper alignment
         let prefixLength = prefix.count
         let textWidth = width - prefixLength
 
         if textWidth <= 10 { // Minimum text width
-            return [prefix + "\(colorCode)\(text)\(reset)"]
+            return [prefix + text]
         }
 
-        // Wrap the text content (without color codes for accurate length calculation)
+        // Wrap the text content
         let wrappedText = TextUtils.wrapText(text, width: textWidth)
         var result: [String] = []
 
         for (index, line) in wrappedText.enumerated() {
             if index == 0 {
-                // First line: timestamp + colored text
-                result.append(prefix + "\(colorCode)\(line)\(reset)")
+                // First line: timestamp + emoji + text
+                result.append(prefix + line)
             } else {
-                // Continuation lines: indent to match text start position + colored text
+                // Continuation lines: indent to match text start position
                 let indent = String(repeating: " ", count: prefixLength)
-                result.append(indent + "\(colorCode)\(line)\(reset)")
+                result.append(indent + line)
             }
         }
 
