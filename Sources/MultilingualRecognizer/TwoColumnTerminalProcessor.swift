@@ -7,20 +7,43 @@ struct SpeechMessage {
     var duration: Double
     let locale: String
 
-    var formattedText: String {
-        let flag = flagForLocale(locale)
-        let status = isFinal ? "✅" : "⏳"
-        let timestamp = String(format: "%.1f", startTime)
-        return "\(status) \(flag) [\(timestamp)s] \(text)"
+    func formatForColumn(width: Int) -> [String] {
+        let timestamp = String(format: "%5.1f", startTime)
+
+        // Color codes for status indication
+        let brightWhite = "\u{001B}[97m"  // Bright white for final
+        let dimGray = "\u{001B}[90m"      // Dim gray for pending
+        let reset = "\u{001B}[0m"         // Reset color
+
+        let colorCode = isFinal ? brightWhite : dimGray
+        let prefix = "\(timestamp)s "
+
+        // Calculate the exact prefix length for proper alignment
+        let prefixLength = prefix.count
+        let textWidth = width - prefixLength
+
+        if textWidth <= 10 { // Minimum text width
+            return [prefix + "\(colorCode)\(text)\(reset)"]
+        }
+
+        // Wrap the text content (without color codes for accurate length calculation)
+        let wrappedText = TextUtils.wrapText(text, width: textWidth)
+        var result: [String] = []
+
+        for (index, line) in wrappedText.enumerated() {
+            if index == 0 {
+                // First line: timestamp + colored text
+                result.append(prefix + "\(colorCode)\(line)\(reset)")
+            } else {
+                // Continuation lines: indent to match text start position + colored text
+                let indent = String(repeating: " ", count: prefixLength)
+                result.append(indent + "\(colorCode)\(line)\(reset)")
+            }
+        }
+
+        return result
     }
 
-    private func flagForLocale(_ locale: String) -> String {
-        switch locale {
-        case "en-US", "en": return "🇺🇸"
-        case "fr-FR", "fr": return "🇫🇷"
-        default: return "🌍"
-        }
-    }
 }
 
 @available(macOS 26.0, *)
@@ -102,11 +125,9 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
         print(header)
         print(String(repeating: "─", count: terminalWidth))
 
-        // Get wrapped lines for both columns
-        let englishLines = englishMessages.map { $0.formattedText }
-        let frenchLines = frenchMessages.map { $0.formattedText }
-        let wrappedEnglish = wrapLines(englishLines)
-        let wrappedFrench = wrapLines(frenchLines)
+        // Get wrapped lines for both columns with proper formatting
+        let wrappedEnglish = englishMessages.flatMap { $0.formatForColumn(width: columnWidth) }
+        let wrappedFrench = frenchMessages.flatMap { $0.formatForColumn(width: columnWidth) }
 
         // Print columns side by side
         let maxLines = max(wrappedEnglish.count, wrappedFrench.count)
@@ -114,6 +135,7 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
             let englishLine = i < wrappedEnglish.count ? wrappedEnglish[i] : ""
             let frenchLine = i < wrappedFrench.count ? wrappedFrench[i] : ""
 
+            // Pad each line to exact column width, accounting for emoji visual width
             let leftColumn = formatColumnText(englishLine, width: columnWidth)
             let rightColumn = formatColumnText(frenchLine, width: columnWidth)
 
@@ -124,68 +146,14 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
     }
 
     private func createHeader() -> String {
-        let englishHeader = "🇺🇸 ENGLISH".padding(toLength: columnWidth, withPad: " ", startingAt: 0)
-        let frenchHeader = "🇫🇷 FRENCH".padding(toLength: columnWidth, withPad: " ", startingAt: 0)
+        let englishHeader = "ENGLISH".padding(toLength: columnWidth, withPad: " ", startingAt: 0)
+        let frenchHeader = "FRENCH".padding(toLength: columnWidth, withPad: " ", startingAt: 0)
         return "\(englishHeader) │ \(frenchHeader)"
     }
 
-    private func wrapLines(_ lines: [String]) -> [String] {
-        var wrappedLines: [String] = []
-        for line in lines {
-            let wrapped = wrapText(line, width: columnWidth)
-            wrappedLines.append(contentsOf: wrapped)
-        }
-        return wrappedLines
-    }
-
-    private func wrapText(_ text: String, width: Int) -> [String] {
-        if text.count <= width {
-            return [text]
-        }
-
-        var lines: [String] = []
-        var currentLine = ""
-        let words = text.split(separator: " ")
-
-        for word in words {
-            let wordStr = String(word)
-            if currentLine.count + wordStr.count + 1 <= width {
-                if currentLine.isEmpty {
-                    currentLine = wordStr
-                } else {
-                    currentLine += " " + wordStr
-                }
-            } else {
-                if !currentLine.isEmpty {
-                    lines.append(currentLine)
-                    currentLine = wordStr
-                } else {
-                    // Word is longer than width, split it
-                    let chunks = wordStr.chunked(into: width)
-                    lines.append(contentsOf: chunks.dropLast())
-                    currentLine = chunks.last ?? ""
-                }
-            }
-        }
-
-        if !currentLine.isEmpty {
-            lines.append(currentLine)
-        }
-
-        return lines.isEmpty ? [""] : lines
-    }
 
     private func formatColumnText(_ text: String, width: Int) -> String {
-        return text.padding(toLength: width, withPad: " ", startingAt: 0)
+        return TextUtils.formatColumn(text, width: width)
     }
 }
 
-extension String {
-    func chunked(into size: Int) -> [String] {
-        return stride(from: 0, to: self.count, by: size).map {
-            let start = self.index(self.startIndex, offsetBy: $0)
-            let end = self.index(start, offsetBy: min(size, self.count - $0))
-            return String(self[start..<end])
-        }
-    }
-}

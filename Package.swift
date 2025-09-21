@@ -12,6 +12,10 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MultilingualRecognizer"
+        ),
+        .testTarget(
+            name: "MultilingualRecognizerTests",
+            dependencies: ["MultilingualRecognizer"]
         )
     ]
 )
