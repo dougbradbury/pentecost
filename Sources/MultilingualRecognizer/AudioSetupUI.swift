@@ -9,43 +9,37 @@ struct AudioSetupUI {
         self.audioService = audioService
     }
 
-    /// Run the complete audio device selection process
+    /// Run the complete dual input device selection process
     func runDeviceSelection() async throws {
-        print("🎤 Audio Device Selection")
+        print("🎤 Dual Input Device Selection")
         print(String(repeating: "=", count: 50))
 
-        // Get devices from the audio service
+        // Get input devices from the audio service
         let inputDevices = try audioService.getInputDevices()
-        let outputDevices = try audioService.getOutputDevices()
 
         guard !inputDevices.isEmpty else {
             print("❌ No input devices found")
             throw AudioSetupError.noInputDevices
         }
 
-        guard !outputDevices.isEmpty else {
-            print("❌ No output devices found")
-            throw AudioSetupError.noOutputDevices
-        }
+        // Display input devices
+        displayInputDevices(inputDevices: inputDevices)
 
-        // Display device lists
-        displayDevices(inputDevices: inputDevices, outputDevices: outputDevices)
+        // Select first input device (local microphone)
+        let firstInputDevice = try await selectFirstInputDevice(from: inputDevices)
+        try audioService.setFirstInputDevice(firstInputDevice)
+        print("🎯 LOCAL (Mic): Using \(firstInputDevice.description)")
 
-        // Select input device
-        let selectedInputDevice = try await selectInputDevice(from: inputDevices)
-        try audioService.setInputDevice(selectedInputDevice)
-        print("🎯 Input: Using \(selectedInputDevice.description)")
-
-        // Select output device
-        let selectedOutputDevice = try await selectOutputDevice(from: outputDevices)
-        try audioService.setOutputDevice(selectedOutputDevice)
-        print("🎯 Output: Using \(selectedOutputDevice.description)")
+        // Select second input device (remote/system audio)
+        let secondInputDevice = try await selectSecondInputDevice(from: inputDevices)
+        try audioService.setSecondInputDevice(secondInputDevice)
+        print("🎯 REMOTE (System): Using \(secondInputDevice.description)")
     }
 
     // MARK: - Private Methods
 
-    private func displayDevices(inputDevices: [AudioDevice], outputDevices: [AudioDevice]) {
-        print("📋 All available audio devices:")
+    private func displayInputDevices(inputDevices: [AudioDevice]) {
+        print("📋 Available input devices:")
         print("")
 
         // Display input devices
@@ -54,19 +48,11 @@ struct AudioSetupUI {
             let prefix = device.isDefaultInput ? "👑" : "  "
             print("\(prefix)\(index + 1). \(device.description)")
         }
-
         print("")
-
-        // Display output devices
-        print("🔊 OUTPUT DEVICES:")
-        for (index, device) in outputDevices.enumerated() {
-            let prefix = device.isDefaultOutput ? "👑" : "  "
-            print("\(prefix)\(index + 1). \(device.description)")
-        }
     }
 
-    private func selectInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
-        print("\n🎤 Select INPUT device (1-\(devices.count), or press Enter for default): ", terminator: "")
+    private func selectFirstInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
+        print("🎤 Select FIRST input device (LOCAL/MIC) (1-\(devices.count), or press Enter for default): ", terminator: "")
 
         if let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) {
             if input.isEmpty {
@@ -76,7 +62,7 @@ struct AudioSetupUI {
                 // Use selected device
                 return devices[deviceIndex - 1]
             } else {
-                print("❌ Invalid input selection. Using default device.")
+                print("❌ Invalid selection. Using default device.")
                 return devices.first { $0.isDefaultInput } ?? devices[0]
             }
         } else {
@@ -85,23 +71,23 @@ struct AudioSetupUI {
         }
     }
 
-    private func selectOutputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
-        print("\n🔊 Select OUTPUT device (1-\(devices.count), or press Enter for default): ", terminator: "")
+    private func selectSecondInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
+        print("🔊 Select SECOND input device (REMOTE/SYSTEM) (1-\(devices.count), or press Enter for BlackHole): ", terminator: "")
 
         if let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) {
             if input.isEmpty {
-                // Use default device
-                return devices.first { $0.isDefaultOutput } ?? devices[0]
+                // Try to find BlackHole as default for second input
+                return devices.first { $0.name.contains("BlackHole") } ?? devices[0]
             } else if let deviceIndex = Int(input), deviceIndex >= 1, deviceIndex <= devices.count {
                 // Use selected device
                 return devices[deviceIndex - 1]
             } else {
-                print("❌ Invalid output selection. Using default device.")
-                return devices.first { $0.isDefaultOutput } ?? devices[0]
+                print("❌ Invalid selection. Using BlackHole or first device.")
+                return devices.first { $0.name.contains("BlackHole") } ?? devices[0]
             }
         } else {
-            // Fallback to default if no input
-            return devices.first { $0.isDefaultOutput } ?? devices[0]
+            // Fallback to BlackHole if available
+            return devices.first { $0.name.contains("BlackHole") } ?? devices[0]
         }
     }
 }
@@ -110,14 +96,11 @@ struct AudioSetupUI {
 
 enum AudioSetupError: Error, LocalizedError {
     case noInputDevices
-    case noOutputDevices
 
     var errorDescription: String? {
         switch self {
         case .noInputDevices:
             return "No input devices available"
-        case .noOutputDevices:
-            return "No output devices available"
         }
     }
 }

@@ -5,77 +5,60 @@ import AVFoundation
 @available(macOS 26.0, *)
 final class AudioEngineService {
     private let deviceManager = AudioDeviceManager()
-    private var audioEngine: AVAudioEngine?
-    private var selectedInputDevice: AudioDevice?
-    private var selectedOutputDevice: AudioDevice?
+    private var firstInputDevice: AudioDevice?
+    private var secondInputDevice: AudioDevice?
 
     /// Get all available input devices
     func getInputDevices() throws -> [AudioDevice] {
         return try deviceManager.getInputDevices()
     }
 
-    /// Get all available output devices
-    func getOutputDevices() throws -> [AudioDevice] {
-        return try deviceManager.getOutputDevices()
-    }
-
-    /// Get all available audio devices
-    func getAllDevices() throws -> [AudioDevice] {
-        return try deviceManager.getAllAudioDevices()
-    }
-
-    /// Set the current input device
-    func setInputDevice(_ device: AudioDevice) throws {
+    /// Set the first input device (local microphone)
+    func setFirstInputDevice(_ device: AudioDevice) throws {
         guard device.hasInput else {
             throw AudioEngineServiceError.deviceHasNoInput
         }
+        firstInputDevice = device
+    }
 
-        selectedInputDevice = device
-
-        // If we already have an audio engine, apply the device change immediately
-        if let audioEngine = audioEngine {
-            try deviceManager.setInputDevice(device, for: audioEngine)
+    /// Set the second input device (remote/system audio)
+    func setSecondInputDevice(_ device: AudioDevice) throws {
+        guard device.hasInput else {
+            throw AudioEngineServiceError.deviceHasNoInput
         }
+        secondInputDevice = device
     }
 
-    /// Set the current output device (stored for future recording capability)
-    func setOutputDevice(_ device: AudioDevice) throws {
-        guard device.hasOutput else {
-            throw AudioEngineServiceError.deviceHasNoOutput
-        }
-
-        selectedOutputDevice = device
-        // Note: Output device setting will be implemented when we add recording
+    /// Get the first input device (local microphone)
+    func getFirstInputDevice() -> AudioDevice? {
+        return firstInputDevice
     }
 
-    /// Get the currently selected input device
-    func getCurrentInputDevice() -> AudioDevice? {
-        return selectedInputDevice
+    /// Get the second input device (remote/system audio)
+    func getSecondInputDevice() -> AudioDevice? {
+        return secondInputDevice
     }
 
-    /// Get the currently selected output device
-    func getCurrentOutputDevice() -> AudioDevice? {
-        return selectedOutputDevice
-    }
-
-    /// Create and configure the audio engine with selected devices
-    func createConfiguredAudioEngine() throws -> AVAudioEngine {
+    /// Create audio engine configured with the first input device (local)
+    func createFirstAudioEngine() throws -> AVAudioEngine {
         let engine = AVAudioEngine()
 
-        // Apply input device selection if available
-        if let inputDevice = selectedInputDevice {
-            try deviceManager.setInputDevice(inputDevice, for: engine)
+        if let device = firstInputDevice {
+            try deviceManager.setInputDevice(device, for: engine)
         }
-
-        // Store engine reference for future device changes
-        audioEngine = engine
 
         return engine
     }
 
-    /// Get audio format information for the current input
-    func getInputFormat() -> AVAudioFormat? {
-        return audioEngine?.inputNode.outputFormat(forBus: 0)
+    /// Create audio engine configured with the second input device (remote)
+    func createSecondAudioEngine() throws -> AVAudioEngine {
+        let engine = AVAudioEngine()
+
+        if let device = secondInputDevice {
+            try deviceManager.setInputDevice(device, for: engine)
+        }
+
+        return engine
     }
 }
 
@@ -83,17 +66,11 @@ final class AudioEngineService {
 
 enum AudioEngineServiceError: Error, LocalizedError {
     case deviceHasNoInput
-    case deviceHasNoOutput
-    case noAudioEngineConfigured
 
     var errorDescription: String? {
         switch self {
         case .deviceHasNoInput:
             return "Selected device has no input channels"
-        case .deviceHasNoOutput:
-            return "Selected device has no output channels"
-        case .noAudioEngineConfigured:
-            return "No audio engine has been configured"
         }
     }
 }
