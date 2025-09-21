@@ -47,9 +47,9 @@ final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
 
             let response = try await session.translate(text)
 
-            // Pass the translated result to the next processor
+            // Pass the translated result to the next processor with translation indicator
             await nextProcessor.process(
-                text: response.targetText,
+                text: "🔄 \(response.targetText)",
                 isFinal: true,
                 startTime: startTime,
                 duration: duration,
