@@ -77,12 +77,13 @@ func setupRecognition(ui: UserInterface, speechProcessor: SpeechProcessor) async
 func main() async {
     let ui: UserInterface = TerminalUI()
 
-    // Create processing chain: Recognition → Translation → Two-Column Display
+    // Create processing chain: Recognition → Language Filter → Translation → Two-Column Display
     let terminalProcessor = TwoColumnTerminalProcessor(terminalWidth: 120)
     let translationProcessor = TranslationProcessor(nextProcessor: terminalProcessor)
+    let languageFilter = LanguageFilterProcessor(nextProcessor: translationProcessor)
 
     // Set up recognition
-    guard let (recognizer, audioEngine) = await setupRecognition(ui: ui, speechProcessor: translationProcessor) else {
+    guard let (recognizer, audioEngine) = await setupRecognition(ui: ui, speechProcessor: languageFilter) else {
         return
     }
 
