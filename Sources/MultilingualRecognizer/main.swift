@@ -5,8 +5,7 @@ import Foundation
 // MARK: - App Entry Point
 
 @available(macOS 26.0, *)
-func main() async {
-    let ui: UserInterface = TerminalUI()
+func setupRecognition(ui: UserInterface, speechProcessor: SpeechProcessor) async -> (ProductionMultilingualRecognizer, AVAudioEngine)? {
     ui.status("🌍 Multilingual Recognizer - English & French with Automatic Language Detection")
     ui.status("📱 Platform: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
 
@@ -19,7 +18,7 @@ func main() async {
 
     guard speechAuth == .authorized else {
         ui.status("❌ Speech recognition not authorized")
-        return
+        return nil
     }
 
     let micPermission = await withCheckedContinuation { continuation in
@@ -30,18 +29,14 @@ func main() async {
 
     guard micPermission else {
         ui.status("❌ Microphone permission denied")
-        return
+        return nil
     }
 
     ui.status("✅ Permissions granted")
 
     do {
-        // Create processing chain: Recognition → Translation → Display
-        let displayProcessor = DisplayProcessor()
-        let translationProcessor = TranslationProcessor(nextProcessor: displayProcessor)
-
         // Create multilingual recognizer with the processing chain
-        let recognizer = ProductionMultilingualRecognizer(ui: ui, speechProcessor: translationProcessor)
+        let recognizer = ProductionMultilingualRecognizer(ui: ui, speechProcessor: speechProcessor)
 
         // Set up SpeechAnalyzer with multiple languages
         try await recognizer.setUpMultilingualTranscriber()
@@ -67,42 +62,62 @@ func main() async {
 
         // Start audio engine
         try audioEngine.start()
-        ui.status("🎙️ Multilingual recognition active... (Ctrl+C to stop)")
-        ui.status("🗣️  Try speaking in English or French - both streams will show results!")
-        ui.status("📊 Both recognizers running in parallel with confidence measurements")
+        ui.status("🎙️ Multilingual recognition active with real-time translation!")
+        ui.status("🗣️  Speak in English or French - translations will appear!")
 
-        // Status updates every 30 seconds
-        let statusTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
-            Task { @MainActor in
-                ui.status("\n📊 Status: Both English and French recognizers running")
-            }
+        return (recognizer, audioEngine)
+
+    } catch {
+        ui.status("❌ Error: \(error)")
+        return nil
+    }
+}
+
+@available(macOS 26.0, *)
+func main() async {
+    let ui: UserInterface = TerminalUI()
+
+    // Create processing chain: Recognition → Translation → Two-Column Display
+    let terminalProcessor = TwoColumnTerminalProcessor(terminalWidth: 120)
+    let translationProcessor = TranslationProcessor(nextProcessor: terminalProcessor)
+
+    // Set up recognition
+    guard let (recognizer, audioEngine) = await setupRecognition(ui: ui, speechProcessor: translationProcessor) else {
+        return
+    }
+
+    // Status updates every 30 seconds
+    let statusTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+        Task { @MainActor in
+            ui.status("\n📊 Status: Both English and French recognizers running")
         }
+    }
 
+    do {
         // Keep running indefinitely
         try await Task.sleep(for: .seconds(86400)) // 24 hours
 
         // Clean up (this won't be reached unless interrupted)
         statusTimer.invalidate()
         audioEngine.stop()
-        inputNode.removeTap(onBus: 0)
+        audioEngine.inputNode.removeTap(onBus: 0)
         try await recognizer.finishTranscribing()
-
     } catch {
-        ui.status("❌ Error: \(error)")
+        // Handle cleanup on interruption
+        statusTimer.invalidate()
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        try? await recognizer.finishTranscribing()
     }
 }
 
-func runMain() async {
-    if #available(macOS 26.0, *) {
+// App entry point
+if #available(macOS 26.0, *) {
+    Task {
         await main()
-    } else {
-        print("❌ Requires macOS 26.0+")
     }
-    exit(0)
+    RunLoop.main.run()
+} else {
+    print("❌ Requires macOS 26.0+")
+    exit(1)
 }
-
-Task {
-    await runMain()
-}
-
-RunLoop.main.run()
