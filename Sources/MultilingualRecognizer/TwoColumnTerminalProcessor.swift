@@ -1,9 +1,32 @@
 import Foundation
 
+struct SpeechMessage {
+    let startTime: Double
+    var text: String
+    var isFinal: Bool
+    var duration: Double
+    let locale: String
+
+    var formattedText: String {
+        let flag = flagForLocale(locale)
+        let status = isFinal ? "✅" : "⏳"
+        let timestamp = String(format: "%.1f", startTime)
+        return "\(status) \(flag) [\(timestamp)s] \(text)"
+    }
+
+    private func flagForLocale(_ locale: String) -> String {
+        switch locale {
+        case "en-US", "en": return "🇺🇸"
+        case "fr-FR", "fr": return "🇫🇷"
+        default: return "🌍"
+        }
+    }
+}
+
 @available(macOS 26.0, *)
 final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
-    private var englishLines: [String] = []
-    private var frenchLines: [String] = []
+    private var englishMessages: [SpeechMessage] = []
+    private var frenchMessages: [SpeechMessage] = []
     private let terminalWidth: Int
     private let columnWidth: Int
     private let leftMargin = 0
@@ -15,57 +38,59 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
     }
 
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
-        let flag = flagForLocale(locale)
-        let timestamp = String(format: "%.1f", startTime)
-        let status = isFinal ? "✅" : "⏳"
-        let formattedText = "\(status) \(flag) [\(timestamp)s] \(text)"
-
         switch locale {
         case "en-US", "en":
-            await updateEnglishColumn(formattedText, isFinal: isFinal)
+            await updateEnglishMessages(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
         case "fr-FR", "fr":
-            await updateFrenchColumn(formattedText, isFinal: isFinal)
+            await updateFrenchMessages(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
         default:
             break
         }
-    }
-
-    private func updateEnglishColumn(_ text: String, isFinal: Bool) async {
-        if isFinal {
-            // Replace the last partial result if it exists, otherwise append
-            if !englishLines.isEmpty && englishLines.last?.contains("⏳") == true {
-                englishLines[englishLines.count - 1] = text
-            } else {
-                englishLines.append(text)
-            }
-        } else {
-            // Update the last line for partial results
-            if !englishLines.isEmpty && englishLines.last?.contains("⏳") == true {
-                englishLines[englishLines.count - 1] = text
-            } else {
-                englishLines.append(text)
-            }
-        }
         await redrawColumns()
     }
 
-    private func updateFrenchColumn(_ text: String, isFinal: Bool) async {
-        if isFinal {
-            // Replace the last partial result if it exists, otherwise append
-            if !frenchLines.isEmpty && frenchLines.last?.contains("⏳") == true {
-                frenchLines[frenchLines.count - 1] = text
-            } else {
-                frenchLines.append(text)
-            }
+    private func updateEnglishMessages(text: String, isFinal: Bool, startTime: Double, duration: Double, locale: String) async {
+        // Look for existing message with this startTime
+        if let index = englishMessages.firstIndex(where: { abs($0.startTime - startTime) < 0.1 }) {
+            // Update existing message
+            englishMessages[index].text = text
+            englishMessages[index].isFinal = isFinal
+            englishMessages[index].duration = duration
         } else {
-            // Update the last line for partial results
-            if !frenchLines.isEmpty && frenchLines.last?.contains("⏳") == true {
-                frenchLines[frenchLines.count - 1] = text
-            } else {
-                frenchLines.append(text)
-            }
+            // Create new message
+            let message = SpeechMessage(
+                startTime: startTime,
+                text: text,
+                isFinal: isFinal,
+                duration: duration,
+                locale: locale
+            )
+            englishMessages.append(message)
+            // Sort by startTime to maintain chronological order
+            englishMessages.sort { $0.startTime < $1.startTime }
         }
-        await redrawColumns()
+    }
+
+    private func updateFrenchMessages(text: String, isFinal: Bool, startTime: Double, duration: Double, locale: String) async {
+        // Look for existing message with this startTime
+        if let index = frenchMessages.firstIndex(where: { abs($0.startTime - startTime) < 0.1 }) {
+            // Update existing message
+            frenchMessages[index].text = text
+            frenchMessages[index].isFinal = isFinal
+            frenchMessages[index].duration = duration
+        } else {
+            // Create new message
+            let message = SpeechMessage(
+                startTime: startTime,
+                text: text,
+                isFinal: isFinal,
+                duration: duration,
+                locale: locale
+            )
+            frenchMessages.append(message)
+            // Sort by startTime to maintain chronological order
+            frenchMessages.sort { $0.startTime < $1.startTime }
+        }
     }
 
     private func redrawColumns() async {
@@ -78,6 +103,8 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
         print(String(repeating: "─", count: terminalWidth))
 
         // Get wrapped lines for both columns
+        let englishLines = englishMessages.map { $0.formattedText }
+        let frenchLines = frenchMessages.map { $0.formattedText }
         let wrappedEnglish = wrapLines(englishLines)
         let wrappedFrench = wrapLines(frenchLines)
 
@@ -150,14 +177,6 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
 
     private func formatColumnText(_ text: String, width: Int) -> String {
         return text.padding(toLength: width, withPad: " ", startingAt: 0)
-    }
-
-    private func flagForLocale(_ locale: String) -> String {
-        switch locale {
-        case "en-US", "en": return "🇺🇸"
-        case "fr-FR", "fr": return "🇫🇷"
-        default: return "🌍"
-        }
     }
 }
 
