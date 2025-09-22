@@ -3,6 +3,7 @@ import Foundation
 @available(macOS 26.0, *)
 final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
     private let baseDirectory: URL
+    private let sessionTimestamp: String
     private var openFiles: [String: FileHandle] = [:]
     private let fileManager = FileManager.default
 
@@ -15,6 +16,11 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
                 .path
 
         self.baseDirectory = URL(fileURLWithPath: summaryDirPath)
+
+        // Capture session start time for filename timestamp
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        self.sessionTimestamp = formatter.string(from: Date())
     }
 
     deinit {
@@ -57,7 +63,7 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
         // Create directories if they don't exist
         try fileManager.createDirectory(at: transcriptsDirectory, withIntermediateDirectories: true)
 
-        let filename = "transcript_\(locale).txt"
+        let filename = "transcript_\(sessionTimestamp)_\(locale).txt"
         let fileURL = transcriptsDirectory.appendingPathComponent(filename)
 
         // Create file if it doesn't exist
