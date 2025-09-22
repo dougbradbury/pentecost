@@ -1,0 +1,227 @@
+import XCTest
+@testable import MultilingualRecognizer
+
+@available(macOS 26.0, *)
+final class MessageBufferTests: XCTestCase {
+
+    var messageBuffer: MessageBuffer!
+
+    override func setUp() {
+        super.setUp()
+        messageBuffer = MessageBuffer()
+    }
+
+    override func tearDown() {
+        messageBuffer = nil
+        super.tearDown()
+    }
+
+    // MARK: - Basic Message Addition Tests
+
+    func testAddSingleMessage() {
+        messageBuffer.updateMessage(text: "Hello world", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0].text, "Hello world")
+        XCTAssertEqual(messages[0].isFinal, false)
+        XCTAssertEqual(messages[0].startTime, 1.0, accuracy: 0.001)
+        XCTAssertEqual(messages[0].duration, 0.5, accuracy: 0.001)
+        XCTAssertEqual(messages[0].locale, "en-US")
+    }
+
+    func testAddMultipleMessages() {
+        messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        messageBuffer.updateMessage(text: "Second", isFinal: false, startTime: 2.0, duration: 0.3, locale: "fr-FR")
+        messageBuffer.updateMessage(text: "Third", isFinal: true, startTime: 3.0, duration: 0.7, locale: "es-ES")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 3)
+        XCTAssertEqual(messages[0].text, "First")
+        XCTAssertEqual(messages[1].text, "Second")
+        XCTAssertEqual(messages[2].text, "Third")
+    }
+
+    func testInitiallyEmpty() {
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 0)
+    }
+
+    // MARK: - Message Update Tests
+
+    func testUpdateExistingMessage() {
+        // Add initial message
+        messageBuffer.updateMessage(text: "Hello", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+
+        // Update the same message (same startTime within tolerance)
+        messageBuffer.updateMessage(text: "Hello world", isFinal: true, startTime: 1.05, duration: 0.8, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1) // Should still be one message
+        XCTAssertEqual(messages[0].text, "Hello world") // Text updated
+        XCTAssertEqual(messages[0].isFinal, true) // Status updated
+        XCTAssertEqual(messages[0].duration, 0.8, accuracy: 0.001) // Duration updated
+        XCTAssertEqual(messages[0].startTime, 1.0, accuracy: 0.001) // StartTime remains original
+    }
+
+    func testUpdateWithinTimeTolerance() {
+        messageBuffer.updateMessage(text: "Original", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+
+        // Update with startTime within 0.1 tolerance (1.09 is within 0.1 of 1.0)
+        messageBuffer.updateMessage(text: "Updated", isFinal: true, startTime: 1.09, duration: 0.8, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0].text, "Updated")
+    }
+
+    func testUpdateOutsideTimeTolerance() {
+        messageBuffer.updateMessage(text: "First", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+
+        // Add with startTime outside 0.1 tolerance (1.2 is outside 0.1 of 1.0)
+        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 1.2, duration: 0.8, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 2) // Should be two separate messages
+        XCTAssertEqual(messages[0].text, "First")
+        XCTAssertEqual(messages[1].text, "Second")
+    }
+
+    // MARK: - Chronological Ordering Tests
+
+    func testMessagesAreOrderedByStartTime() {
+        // Add messages out of chronological order
+        messageBuffer.updateMessage(text: "Third", isFinal: true, startTime: 3.0, duration: 0.5, locale: "en-US")
+        messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 2.0, duration: 0.5, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 3)
+        XCTAssertEqual(messages[0].text, "First")
+        XCTAssertEqual(messages[0].startTime, 1.0, accuracy: 0.001)
+        XCTAssertEqual(messages[1].text, "Second")
+        XCTAssertEqual(messages[1].startTime, 2.0, accuracy: 0.001)
+        XCTAssertEqual(messages[2].text, "Third")
+        XCTAssertEqual(messages[2].startTime, 3.0, accuracy: 0.001)
+    }
+
+    func testOrderingMaintainedAfterUpdates() {
+        // Add messages in order
+        messageBuffer.updateMessage(text: "First", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+        messageBuffer.updateMessage(text: "Second", isFinal: false, startTime: 2.0, duration: 0.5, locale: "en-US")
+        messageBuffer.updateMessage(text: "Third", isFinal: false, startTime: 3.0, duration: 0.5, locale: "en-US")
+
+        // Update middle message
+        messageBuffer.updateMessage(text: "Second Updated", isFinal: true, startTime: 2.0, duration: 0.8, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 3)
+        XCTAssertEqual(messages[0].text, "First")
+        XCTAssertEqual(messages[1].text, "Second Updated") // Updated but still in correct position
+        XCTAssertEqual(messages[2].text, "Third")
+    }
+
+    // MARK: - EndTime Calculation Tests
+
+    func testEndTimeCalculation() {
+        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.5, duration: 2.3, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+
+        let expectedEndTime = 1.5 + 2.3 // 3.8
+        XCTAssertEqual(messages[0].endTime, expectedEndTime, accuracy: 0.001)
+    }
+
+    func testEndTimeAfterUpdate() {
+        messageBuffer.updateMessage(text: "Test", isFinal: false, startTime: 1.0, duration: 1.0, locale: "en-US")
+        messageBuffer.updateMessage(text: "Test Updated", isFinal: true, startTime: 1.0, duration: 2.5, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+
+        let expectedEndTime = 1.0 + 2.5 // 3.5
+        XCTAssertEqual(messages[0].endTime, expectedEndTime, accuracy: 0.001)
+    }
+
+    // MARK: - Clear Messages Tests
+
+    func testClearMessages() {
+        messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 2.0, duration: 0.5, locale: "en-US")
+
+        XCTAssertEqual(messageBuffer.getMessages().count, 2)
+
+        messageBuffer.clearMessages()
+        XCTAssertEqual(messageBuffer.getMessages().count, 0)
+    }
+
+    func testClearEmptyBuffer() {
+        XCTAssertEqual(messageBuffer.getMessages().count, 0)
+
+        messageBuffer.clearMessages() // Should not crash
+        XCTAssertEqual(messageBuffer.getMessages().count, 0)
+    }
+
+    // MARK: - Language Agnostic Tests
+
+    func testLanguageAgnostic() {
+        // Should work with any locale string
+        messageBuffer.updateMessage(text: "English", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        messageBuffer.updateMessage(text: "French", isFinal: true, startTime: 2.0, duration: 0.5, locale: "fr-FR")
+        messageBuffer.updateMessage(text: "Spanish", isFinal: true, startTime: 3.0, duration: 0.5, locale: "es-ES")
+        messageBuffer.updateMessage(text: "Chinese", isFinal: true, startTime: 4.0, duration: 0.5, locale: "zh-CN")
+        messageBuffer.updateMessage(text: "Custom", isFinal: true, startTime: 5.0, duration: 0.5, locale: "custom-locale")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 5)
+        XCTAssertEqual(messages[0].locale, "en-US")
+        XCTAssertEqual(messages[1].locale, "fr-FR")
+        XCTAssertEqual(messages[2].locale, "es-ES")
+        XCTAssertEqual(messages[3].locale, "zh-CN")
+        XCTAssertEqual(messages[4].locale, "custom-locale")
+    }
+
+    // MARK: - Edge Cases
+
+    func testZeroDuration() {
+        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: 0.0, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0].endTime, 1.0, accuracy: 0.001)
+    }
+
+    func testNegativeDuration() {
+        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: -0.5, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0].endTime, 0.5, accuracy: 0.001) // 1.0 + (-0.5)
+    }
+
+    func testZeroStartTime() {
+        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 0.0, duration: 1.0, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0].startTime, 0.0, accuracy: 0.001)
+        XCTAssertEqual(messages[0].endTime, 1.0, accuracy: 0.001)
+    }
+
+    func testEmptyText() {
+        messageBuffer.updateMessage(text: "", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0].text, "")
+    }
+
+    func testEmptyLocale() {
+        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: 0.5, locale: "")
+
+        let messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(messages[0].locale, "")
+    }
+}
