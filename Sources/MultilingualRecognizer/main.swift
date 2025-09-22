@@ -3,6 +3,13 @@ import Foundation
 @preconcurrency import AVFoundation
 import CoreAudio
 
+// MARK: - Error Types
+
+enum AudioError: Error {
+    case formatError(String)
+    case deviceError(String)
+}
+
 // MARK: - App Entry Point
 
 @available(macOS 26.0, *)
@@ -26,11 +33,17 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         }
 
         let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        ui.status("🎤 LOCAL audio: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount) channels")
+        let deviceFormat = inputNode.outputFormat(forBus: 0)
+        ui.status("🎤 LOCAL device format: \(deviceFormat.sampleRate)Hz, \(deviceFormat.channelCount) channels")
+
+        // Use 48kHz format for speech recognition - proven to work best
+        guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 1, interleaved: false) else {
+            throw AudioError.formatError("Failed to create tap audio format")
+        }
+        ui.status("🎤 LOCAL tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for local audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { [englishRecognizer, frenchRecognizer] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [englishRecognizer, frenchRecognizer] buffer, _ in
             Task { @Sendable in
                 do {
                     try await englishRecognizer.streamAudioToTranscriber(buffer)
@@ -76,11 +89,17 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         }
 
         let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        ui.status("🔊 REMOTE audio: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount) channels")
+        let deviceFormat = inputNode.outputFormat(forBus: 0)
+        ui.status("🔊 REMOTE device format: \(deviceFormat.sampleRate)Hz, \(deviceFormat.channelCount) channels")
+
+        // Use 48kHz format for speech recognition - proven to work best
+        guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 1, interleaved: false) else {
+            throw AudioError.formatError("Failed to create tap audio format")
+        }
+        ui.status("🔊 REMOTE tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for remote audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { [englishRecognizer, frenchRecognizer] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [englishRecognizer, frenchRecognizer] buffer, _ in
             Task { @Sendable in
                 do {
                     try await englishRecognizer.streamAudioToTranscriber(buffer)

@@ -2,15 +2,19 @@ import Foundation
 
 @available(macOS 26.0, *)
 final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
-    private let outputDirectory: URL
+    private let baseDirectory: URL
     private var openFiles: [String: FileHandle] = [:]
     private let fileManager = FileManager.default
 
-    init(outputDirectory: URL = URL(fileURLWithPath: "transcripts")) {
-        self.outputDirectory = outputDirectory
+    init() {
+        // Read MEETING_SUMMARY_DIR environment variable
+        let summaryDirPath = ProcessInfo.processInfo.environment["MEETING_SUMMARY_DIR"]
+            ?? URL(fileURLWithPath: NSHomeDirectory())
+                .appendingPathComponent("Meeting_Recordings")
+                .appendingPathComponent("summaries")
+                .path
 
-        // Create output directory if it doesn't exist
-        try? fileManager.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        self.baseDirectory = URL(fileURLWithPath: summaryDirPath)
     }
 
     deinit {
@@ -46,8 +50,15 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
             return existing
         }
 
+        // Get current weekly directory and create transcripts subdirectory
+        let weeklyDirectory = getWeeklyDirectory()
+        let transcriptsDirectory = weeklyDirectory.appendingPathComponent("transcripts")
+
+        // Create directories if they don't exist
+        try fileManager.createDirectory(at: transcriptsDirectory, withIntermediateDirectories: true)
+
         let filename = "transcript_\(locale).txt"
-        let fileURL = outputDirectory.appendingPathComponent(filename)
+        let fileURL = transcriptsDirectory.appendingPathComponent(filename)
 
         // Create file if it doesn't exist
         if !fileManager.fileExists(atPath: fileURL.path) {
@@ -60,6 +71,26 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
 
         openFiles[locale] = fileHandle
         return fileHandle
+    }
+
+    private func getWeeklyDirectory() -> URL {
+        let calendar = Calendar.current
+        let now = Date()
+
+        // Calculate the start of the week (Monday)
+        let weekday = calendar.component(.weekday, from: now)
+        // weekday: 1 = Sunday, 2 = Monday, ..., 7 = Saturday
+        // We want Monday as start of week
+        let daysSinceMonday = (weekday == 1) ? 6 : weekday - 2
+
+        let monday = calendar.date(byAdding: .day, value: -daysSinceMonday, to: now) ?? now
+
+        // Format the week directory name as "Week_YYYY-MM-DD" (Monday's date)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let weekName = "Week_\(formatter.string(from: monday))"
+
+        return baseDirectory.appendingPathComponent(weekName)
     }
 
     private func formatTimestamp(_ time: Double) -> String {
