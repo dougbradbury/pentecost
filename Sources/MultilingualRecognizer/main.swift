@@ -139,13 +139,17 @@ func main() async {
 
     // Create separate processing chains for each audio stream
 
-    // LOCAL (microphone) processing chain
+    // Shared processors
     let terminalProcessor = TwoColumnTerminalProcessor(terminalWidth: 120)
-    let localTranslationProcessor = TranslationProcessor(nextProcessor: terminalProcessor)
+    let transcriptProcessor = TranscriptFileProcessor()
+    let broadcastProcessor = BroadcastProcessor(processors: [terminalProcessor, transcriptProcessor])
+
+    // LOCAL (microphone) processing chain
+    let localTranslationProcessor = TranslationProcessor(nextProcessor: broadcastProcessor)
     let localLanguageFilter = LanguageFilterProcessor(nextProcessor: localTranslationProcessor)
 
     // REMOTE (BlackHole) processing chain
-    let remoteTranslationProcessor = TranslationProcessor(nextProcessor: terminalProcessor)
+    let remoteTranslationProcessor = TranslationProcessor(nextProcessor: broadcastProcessor)
     let remoteLanguageFilter = LanguageFilterProcessor(nextProcessor: remoteTranslationProcessor)
 
     // Create audio service and setup UI
