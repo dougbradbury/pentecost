@@ -1,7 +1,7 @@
 import Foundation
 
 struct SpeechMessage {
-    let startTime: Double
+    var startTime: Double
     var text: String
     var isFinal: Bool
     var duration: Double

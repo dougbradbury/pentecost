@@ -78,8 +78,8 @@ final class MessageBufferTests: XCTestCase {
     func testUpdateOutsideTimeTolerance() {
         messageBuffer.updateMessage(text: "First", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
 
-        // Add with startTime outside 0.1 tolerance (1.2 is outside 0.1 of 1.0)
-        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 1.2, duration: 0.8, locale: "en-US")
+        // Add with startTime outside 0.1 tolerance and after First ends (1.6 is after 1.5)
+        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 1.6, duration: 0.8, locale: "en-US")
 
         let messages = messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 2) // Should be two separate messages
@@ -223,5 +223,74 @@ final class MessageBufferTests: XCTestCase {
         let messages = messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].locale, "")
+    }
+
+    // MARK: - Realistic Speech Recognition Scenarios
+
+    func testOldPendingMessageReplacementScenario() {
+        // Scenario: After silence, analyzer first detects something far back in time as pending,
+        // then corrects with actual speech start time
+
+        // Step 1: Current time is around 10 seconds, someone starts talking
+        messageBuffer.updateMessage(text: "Hello", isFinal: false, startTime: 10.0, duration: 0.5, locale: "en-US")
+
+        // Step 2: Analyzer initially reports some phantom detection from way back during silence
+        // This is a pending message with start time much earlier
+        messageBuffer.updateMessage(text: "Hmm", isFinal: false, startTime: 5.0, duration: 1.0, locale: "en-US")
+
+        // At this point we should have 2 messages (they're outside 0.1s tolerance)
+        var messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 2)
+        XCTAssertEqual(messages[0].startTime, 5.0, accuracy: 0.001) // Chronologically first
+        XCTAssertEqual(messages[0].text, "Hmm")
+        XCTAssertEqual(messages[1].startTime, 10.0, accuracy: 0.001)
+        XCTAssertEqual(messages[1].text, "Hello")
+
+        // Step 3: Update comes in that corrects the phantom detection - same text but proper start time
+        // This should replace the old pending "Hmm" message even though start time is very different
+        // Use a start time that doesn't overlap with "Hello" (which ends at 10.5)
+        messageBuffer.updateMessage(text: "Hmm", isFinal: false, startTime: 11.0, duration: 0.8, locale: "en-US")
+
+        // Now we should still have 2 messages, but the "Hmm" should be updated to the correct time
+        messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 2)
+
+        // The messages should now be in the correct order
+        XCTAssertEqual(messages[0].startTime, 10.0, accuracy: 0.001) // "Hello"
+        XCTAssertEqual(messages[0].text, "Hello")
+        XCTAssertEqual(messages[1].startTime, 11.0, accuracy: 0.001) // "Hmm" updated to correct time
+        XCTAssertEqual(messages[1].text, "Hmm")
+        XCTAssertEqual(messages[1].duration, 0.8, accuracy: 0.001) // Duration updated too
+    }
+
+    func testPendingMessageTextMatchingWithTimeCorrection() {
+        // Similar scenario but focusing on text matching for pending messages
+
+        // Add some established final messages
+        messageBuffer.updateMessage(text: "Previous", isFinal: true, startTime: 8.0, duration: 1.0, locale: "en-US")
+
+        // Phantom detection from way back
+        messageBuffer.updateMessage(text: "Let me jump in", isFinal: false, startTime: 2.0, duration: 8.5, locale: "en-US")
+
+        // Current actual speech
+        messageBuffer.updateMessage(text: "Let me jump in and tell you", isFinal: false, startTime: 10.0, duration: 6.5, locale: "en-US")
+
+        // Should have 3 messages at this point
+        var messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 2)
+
+        // Correction comes in: same text "Testing" but with proper timing near current speech
+        messageBuffer.updateMessage(text: "Let me jump in and tell you something", isFinal: true, startTime: 10.5, duration: 7.7, locale: "en-US")
+
+        // Should still have 3 messages, but "Testing" moved to correct position
+        messages = messageBuffer.getMessages()
+        XCTAssertEqual(messages.count, 2)
+
+        // Verify chronological order and that "Testing" was moved
+        XCTAssertEqual(messages[0].text, "Previous")
+        XCTAssertEqual(messages[0].startTime, 8.0, accuracy: 0.001)
+
+        XCTAssertEqual(messages[1].text, "Let me jump in and tell you something")
+        XCTAssertEqual(messages[1].startTime, 10.5, accuracy: 0.001)
     }
 }
