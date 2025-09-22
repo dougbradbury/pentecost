@@ -50,10 +50,10 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
     private let frenchBuffer: MessageBuffer
     private let terminalRenderer: TerminalRenderer
 
-    init(terminalWidth: Int = 120) {
+    init() {
         self.englishBuffer = MessageBuffer()
         self.frenchBuffer = MessageBuffer()
-        self.terminalRenderer = TerminalRenderer(terminalWidth: terminalWidth)
+        self.terminalRenderer = TerminalRenderer()
     }
 
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {

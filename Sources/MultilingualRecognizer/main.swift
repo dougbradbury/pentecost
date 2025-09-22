@@ -159,7 +159,7 @@ func main() async {
     // Create separate processing chains for each audio stream
 
     // Shared processors
-    let terminalProcessor = TwoColumnTerminalProcessor(terminalWidth: 120)
+    let terminalProcessor = TwoColumnTerminalProcessor()
     let transcriptProcessor = TranscriptFileProcessor()
     let broadcastProcessor = BroadcastProcessor(processors: [terminalProcessor, transcriptProcessor])
 
