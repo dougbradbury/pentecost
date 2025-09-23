@@ -59,9 +59,9 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
         switch locale {
         case "en-US", "en":
-            englishBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
+            await englishBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
         case "fr-FR", "fr":
-            frenchBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
+            await frenchBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
         default:
             break
         }
@@ -69,8 +69,8 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
     }
 
     private func render() async {
-        let englishMessages = englishBuffer.getMessages()
-        let frenchMessages = frenchBuffer.getMessages()
+        let englishMessages = await englishBuffer.getMessages()
+        let frenchMessages = await frenchBuffer.getMessages()
         terminalRenderer.render(englishMessages: englishMessages, frenchMessages: frenchMessages)
     }
 }

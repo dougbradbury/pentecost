@@ -1,7 +1,7 @@
 import Foundation
 
 @available(macOS 26.0, *)
-final class MessageBuffer: @unchecked Sendable {
+actor MessageBuffer {
     private var messages: [SpeechMessage] = []
 
     func updateMessage(text: String, isFinal: Bool, startTime: Double, duration: Double, locale: String) {

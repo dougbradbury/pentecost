@@ -140,10 +140,16 @@
 
 ## 🐛 Known Issues & Bugs
 
+- [x] ~~Fix critical thread safety crash in MessageBuffer.sort during concurrent access~~ ✅ **FIXED**
 - [ ] Investigate Speech framework crashes on certain system configurations
 - [ ] Fix occasional audio format compatibility issues
-- [ ] Resolve terminal flicker during high-frequency updates
+- [ ] ~~Resolve terminal flicker during high-frequency updates~~ ✅ **FIXED**
 - [ ] Address memory leaks in long-running sessions
+
+### 🔧 Recently Fixed Issues
+
+- **Thread Safety Crash (Array.sort)**: Fixed by converting MessageBuffer to Swift actor, eliminating concurrent modification crashes during dual-language processing
+- **Terminal Flickering**: Resolved with dynamic terminal sizing and line limiting based on actual terminal dimensions
 
 ## 📋 Completed Features ✅
 
