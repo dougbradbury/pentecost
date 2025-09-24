@@ -142,6 +142,71 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
     }
 }
 
+// MARK: - Signal Handling
+
+import Darwin
+
+// Global shutdown flag (nonisolated for signal handler access)
+nonisolated(unsafe) var shutdownRequested: Bool = false
+
+func setupSignalHandling() {
+    // Simple signal handlers that just set a flag
+    signal(SIGINT) { _ in
+        print("\n🛑 Received shutdown signal (Ctrl-C)...")
+        shutdownRequested = true
+    }
+
+    signal(SIGTERM) { _ in
+        print("\n🛑 Received termination signal...")
+        shutdownRequested = true
+    }
+}
+
+@available(macOS 26.0, *)
+func performCleanShutdown(
+    ui: UserInterface,
+    statusTimer: Timer,
+    inputAudioEngine: AVAudioEngine,
+    remoteAudioEngine: AVAudioEngine,
+    inputEnglishRecognizer: SingleLanguageSpeechRecognizer,
+    inputFrenchRecognizer: SingleLanguageSpeechRecognizer,
+    remoteEnglishRecognizer: SingleLanguageSpeechRecognizer,
+    remoteFrenchRecognizer: SingleLanguageSpeechRecognizer
+) async {
+    ui.status("🛑 Shutting down gracefully...")
+    statusTimer.invalidate()
+
+    // Stop audio engines first to prevent new audio processing
+    inputAudioEngine.stop()
+    remoteAudioEngine.stop()
+
+    // Remove audio taps to stop audio callbacks
+    inputAudioEngine.inputNode.removeTap(onBus: 0)
+    remoteAudioEngine.inputNode.removeTap(onBus: 0)
+
+    // Allow brief time for any pending audio processing to complete
+    do {
+        try await Task.sleep(for: .milliseconds(100))
+    } catch {
+        // Sleep interrupted, continue cleanup
+    }
+
+    // Finish transcription in order to properly close Speech framework resources
+    do {
+        try await inputEnglishRecognizer.finishTranscribing()
+        try await inputFrenchRecognizer.finishTranscribing()
+        try await remoteEnglishRecognizer.finishTranscribing()
+        try await remoteFrenchRecognizer.finishTranscribing()
+    } catch {
+        ui.status("⚠️ Error during transcription cleanup: \(error)")
+    }
+
+    ui.status("✅ Shutdown complete")
+
+    // Exit the process cleanly
+    exit(0)
+}
+
 @available(macOS 26.0, *)
 func main() async {
     let ui: UserInterface = TerminalUI()
@@ -173,6 +238,9 @@ func main() async {
     ui.status("📱 Platform: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
     ui.status("🕊️ Pentecost v1.0 - The Miracle of Understanding")
     print("")
+
+    // Set up signal handling for graceful shutdown
+    setupSignalHandling()
 
     // Request permissions upfront
     let speechAuth = await withCheckedContinuation { continuation in
@@ -260,56 +328,26 @@ func main() async {
         }
     }
 
-    do {
-        // Keep running indefinitely
-        try await Task.sleep(for: .seconds(86400)) // 24 hours
-
-        // Clean up (this won't be reached unless interrupted)
-        ui.status("🛑 Shutting down gracefully...")
-        statusTimer.invalidate()
-
-        // Stop audio engines first to prevent new audio processing
-        inputAudioEngine.stop()
-        remoteAudioEngine.stop()
-
-        // Remove audio taps to stop audio callbacks
-        inputAudioEngine.inputNode.removeTap(onBus: 0)
-        remoteAudioEngine.inputNode.removeTap(onBus: 0)
-
-        // Allow brief time for any pending audio processing to complete
-        try await Task.sleep(for: .milliseconds(100))
-
-        // Finish transcription in order to properly close Speech framework resources
-        try await inputEnglishRecognizer.finishTranscribing()
-        try await inputFrenchRecognizer.finishTranscribing()
-        try await remoteEnglishRecognizer.finishTranscribing()
-        try await remoteFrenchRecognizer.finishTranscribing()
-
-        ui.status("✅ Shutdown complete")
-    } catch {
-        // Handle cleanup on interruption
-        ui.status("🛑 Shutting down on interruption...")
-        statusTimer.invalidate()
-
-        // Stop audio engines first to prevent new audio processing
-        inputAudioEngine.stop()
-        remoteAudioEngine.stop()
-
-        // Remove audio taps to stop audio callbacks
-        inputAudioEngine.inputNode.removeTap(onBus: 0)
-        remoteAudioEngine.inputNode.removeTap(onBus: 0)
-
-        // Allow brief time for any pending audio processing to complete
-        try? await Task.sleep(for: .milliseconds(100))
-
-        // Finish transcription gracefully even on error
-        try? await inputEnglishRecognizer.finishTranscribing()
-        try? await inputFrenchRecognizer.finishTranscribing()
-        try? await remoteEnglishRecognizer.finishTranscribing()
-        try? await remoteFrenchRecognizer.finishTranscribing()
-
-        ui.status("✅ Emergency shutdown complete")
+    // Keep running until signal is received
+    while !shutdownRequested {
+        do {
+            try await Task.sleep(for: .seconds(1))
+        } catch {
+            // Sleep interrupted, continue checking shutdown flag
+        }
     }
+
+    // Perform clean shutdown
+    await performCleanShutdown(
+        ui: ui,
+        statusTimer: statusTimer,
+        inputAudioEngine: inputAudioEngine,
+        remoteAudioEngine: remoteAudioEngine,
+        inputEnglishRecognizer: inputEnglishRecognizer,
+        inputFrenchRecognizer: inputFrenchRecognizer,
+        remoteEnglishRecognizer: remoteEnglishRecognizer,
+        remoteFrenchRecognizer: remoteFrenchRecognizer
+    )
 }
 
 // App entry point
