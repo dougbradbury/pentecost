@@ -17,12 +17,21 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
     ui.status("🎤 Setting up LOCAL audio capture (microphone)")
 
     do {
-        // Create separate recognizers for each language
+        // Create recognizers sequentially to avoid Speech framework conflicts
+        ui.status("🔧 Creating English recognizer...")
         let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US")
+
+        ui.status("🔧 Setting up English transcriber...")
+        try await englishRecognizer.setUpTranscriber()
+
+        // Longer delay between language setups to ensure Speech framework stability
+        ui.status("⏳ Waiting before French setup...")
+        try await Task.sleep(for: .milliseconds(1000))
+
+        ui.status("🔧 Creating French recognizer...")
         let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-FR")
 
-        // Set up both transcribers
-        try await englishRecognizer.setUpTranscriber()
+        ui.status("🔧 Setting up French transcriber...")
         try await frenchRecognizer.setUpTranscriber()
 
         // Set up audio engine with first input device (local microphone)
@@ -73,12 +82,21 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
     ui.status("🔊 Setting up REMOTE audio capture (system/BlackHole)")
 
     do {
-        // Create separate recognizers for each language
+        // Create recognizers sequentially to avoid Speech framework conflicts
+        ui.status("🔧 Creating English recognizer for REMOTE...")
         let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US")
+
+        ui.status("🔧 Setting up English transcriber for REMOTE...")
+        try await englishRecognizer.setUpTranscriber()
+
+        // Longer delay between language setups to ensure Speech framework stability
+        ui.status("⏳ Waiting before French setup for REMOTE...")
+        try await Task.sleep(for: .milliseconds(1000))
+
+        ui.status("🔧 Creating French recognizer for REMOTE...")
         let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-FR")
 
-        // Set up both transcribers
-        try await englishRecognizer.setUpTranscriber()
+        ui.status("🔧 Setting up French transcriber for REMOTE...")
         try await frenchRecognizer.setUpTranscriber()
 
         // Set up audio engine with second input device (remote/system audio)
@@ -181,6 +199,15 @@ func main() async {
 
     ui.status("✅ Permissions granted")
 
+    // Add startup delay to ensure clean Speech framework state
+    ui.status("⏳ Initializing Speech framework...")
+    do {
+        try await Task.sleep(for: .milliseconds(250))
+    } catch {
+        // Sleep cancellation is not a critical error
+        ui.status("⚠️ Initialization delay interrupted")
+    }
+
     // Create separate processing chains for each audio stream
 
     // Shared processors
@@ -213,6 +240,14 @@ func main() async {
         return
     }
 
+    // Add delay between local and remote setup to avoid overwhelming Speech framework
+    ui.status("⏳ Pausing before remote audio setup...")
+    do {
+        try await Task.sleep(for: .milliseconds(1500))
+    } catch {
+        ui.status("⚠️ Remote setup delay interrupted")
+    }
+
     // Set up remote recognition (system/BlackHole audio)
     guard let (remoteEnglishRecognizer, remoteFrenchRecognizer, remoteAudioEngine) = await setupRemoteRecognition(ui: ui, speechProcessor: remoteLanguageFilter, audioService: audioService) else {
         return
@@ -230,26 +265,50 @@ func main() async {
         try await Task.sleep(for: .seconds(86400)) // 24 hours
 
         // Clean up (this won't be reached unless interrupted)
+        ui.status("🛑 Shutting down gracefully...")
         statusTimer.invalidate()
+
+        // Stop audio engines first to prevent new audio processing
         inputAudioEngine.stop()
-        inputAudioEngine.inputNode.removeTap(onBus: 0)
         remoteAudioEngine.stop()
+
+        // Remove audio taps to stop audio callbacks
+        inputAudioEngine.inputNode.removeTap(onBus: 0)
         remoteAudioEngine.inputNode.removeTap(onBus: 0)
+
+        // Allow brief time for any pending audio processing to complete
+        try await Task.sleep(for: .milliseconds(100))
+
+        // Finish transcription in order to properly close Speech framework resources
         try await inputEnglishRecognizer.finishTranscribing()
         try await inputFrenchRecognizer.finishTranscribing()
         try await remoteEnglishRecognizer.finishTranscribing()
         try await remoteFrenchRecognizer.finishTranscribing()
+
+        ui.status("✅ Shutdown complete")
     } catch {
         // Handle cleanup on interruption
+        ui.status("🛑 Shutting down on interruption...")
         statusTimer.invalidate()
+
+        // Stop audio engines first to prevent new audio processing
         inputAudioEngine.stop()
-        inputAudioEngine.inputNode.removeTap(onBus: 0)
         remoteAudioEngine.stop()
+
+        // Remove audio taps to stop audio callbacks
+        inputAudioEngine.inputNode.removeTap(onBus: 0)
         remoteAudioEngine.inputNode.removeTap(onBus: 0)
+
+        // Allow brief time for any pending audio processing to complete
+        try? await Task.sleep(for: .milliseconds(100))
+
+        // Finish transcription gracefully even on error
         try? await inputEnglishRecognizer.finishTranscribing()
         try? await inputFrenchRecognizer.finishTranscribing()
         try? await remoteEnglishRecognizer.finishTranscribing()
         try? await remoteFrenchRecognizer.finishTranscribing()
+
+        ui.status("✅ Emergency shutdown complete")
     }
 }
 
