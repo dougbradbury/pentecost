@@ -5,6 +5,15 @@ import Darwin
 final class TerminalRenderer: @unchecked Sendable {
     private let leftMargin = 0
 
+    // Store previous rendered state for differential updates
+    private var previousLines: [String] = []
+    private var previousTerminalSize: (width: Int, height: Int) = (0, 0)
+    private var isFirstRender = true
+
+    // Render throttling to prevent excessive updates
+    private var lastRenderTime: Date = Date.distantPast
+    private let renderThrottleInterval: TimeInterval = 0.05 // 50ms minimum between renders (20 FPS max)
+
     // Dynamically calculate terminal width
     private var terminalWidth: Int {
         return getTerminalWidth()
@@ -45,19 +54,32 @@ final class TerminalRenderer: @unchecked Sendable {
     }
 
     func render(englishMessages: [SpeechMessage], frenchMessages: [SpeechMessage]) {
-        // Clear screen and move cursor to top
-        print("\u{001B}[2J\u{001B}[H", terminator: "")
+        let now = Date()
+        let timeSinceLastRender = now.timeIntervalSince(lastRenderTime)
 
-        // Print header
+        // Throttle rendering to prevent excessive updates
+        if !isFirstRender && timeSinceLastRender < renderThrottleInterval {
+            return
+        }
+
+        let currentTerminalSize = (width: terminalWidth, height: getTerminalHeight())
+
+        // Check if terminal size changed - if so, do full redraw
+        let terminalResized = currentTerminalSize != previousTerminalSize
+
+        // Build new frame content
+        var newLines: [String] = []
+
+        // Add header
         let header = createHeader()
-        print(header)
-        print(String(repeating: "─", count: terminalWidth))
+        newLines.append(header)
+        newLines.append(String(repeating: "─", count: terminalWidth))
 
         // Get wrapped lines for both columns with proper formatting
         let wrappedEnglish = englishMessages.flatMap { $0.formatForColumn(width: columnWidth) }
         let wrappedFrench = frenchMessages.flatMap { $0.formatForColumn(width: columnWidth) }
 
-        // Print columns side by side, limiting total lines to prevent flickering
+        // Build content lines
         let maxLines = max(wrappedEnglish.count, wrappedFrench.count)
         let displayLines = min(maxLines, maxDisplayLines)
 
@@ -76,10 +98,60 @@ final class TerminalRenderer: @unchecked Sendable {
             let leftColumn = formatColumnText(englishLine, width: columnWidth)
             let rightColumn = formatColumnText(frenchLine, width: columnWidth)
 
-            print("\(leftColumn) │ \(rightColumn)")
+            newLines.append("\(leftColumn) │ \(rightColumn)")
         }
 
+        // Perform differential rendering
+        if isFirstRender || terminalResized {
+            // Full redraw on first render or terminal resize
+            print("\u{001B}[2J\u{001B}[H", terminator: "")
+            for line in newLines {
+                print(line)
+            }
+            isFirstRender = false
+        } else {
+            // Differential update - only change lines that differ
+            performDifferentialUpdate(newLines: newLines)
+        }
+
+        // Store current state for next comparison
+        previousLines = newLines
+        previousTerminalSize = currentTerminalSize
+        lastRenderTime = now
+
         fflush(stdout)
+    }
+
+    // Force immediate render bypassing throttle (useful for critical updates)
+    func forceRender(englishMessages: [SpeechMessage], frenchMessages: [SpeechMessage]) {
+        lastRenderTime = Date.distantPast // Reset throttle
+        render(englishMessages: englishMessages, frenchMessages: frenchMessages)
+    }
+
+    private func performDifferentialUpdate(newLines: [String]) {
+        let maxLines = max(newLines.count, previousLines.count)
+
+        for lineIndex in 0..<maxLines {
+            let newLine = lineIndex < newLines.count ? newLines[lineIndex] : ""
+            let oldLine = lineIndex < previousLines.count ? previousLines[lineIndex] : ""
+
+            // Only update if line has changed
+            if newLine != oldLine {
+                // Move cursor to specific line (1-indexed)
+                print("\u{001B}[\(lineIndex + 1);1H", terminator: "")
+
+                // Clear the entire line and write new content
+                print("\u{001B}[2K\(newLine)", terminator: "")
+            }
+        }
+
+        // If new content has fewer lines than before, clear remaining lines
+        if newLines.count < previousLines.count {
+            for lineIndex in newLines.count..<previousLines.count {
+                print("\u{001B}[\(lineIndex + 1);1H", terminator: "")
+                print("\u{001B}[2K", terminator: "") // Clear entire line
+            }
+        }
     }
 
     private func createHeader() -> String {
