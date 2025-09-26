@@ -173,6 +173,9 @@ func performCleanShutdown(
     remoteEnglishRecognizer: SingleLanguageSpeechRecognizer,
     remoteFrenchRecognizer: SingleLanguageSpeechRecognizer
 ) async {
+    // Clear screen for clean shutdown message display
+    print("\u{001B}[2J\u{001B}[H", terminator: "")
+
     ui.status("🛑 Shutting down gracefully...")
     statusTimer.invalidate()
 
