@@ -18,10 +18,10 @@ final class MessageBufferTests: XCTestCase {
 
     // MARK: - Basic Message Addition Tests
 
-    func testAddSingleMessage() {
-        messageBuffer.updateMessage(text: "Hello world", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+    func testAddSingleMessage() async {
+        await messageBuffer.updateMessage(text: "Hello world", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].text, "Hello world")
         XCTAssertEqual(messages[0].isFinal, false)
@@ -30,33 +30,33 @@ final class MessageBufferTests: XCTestCase {
         XCTAssertEqual(messages[0].locale, "en-US")
     }
 
-    func testAddMultipleMessages() {
-        messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
-        messageBuffer.updateMessage(text: "Second", isFinal: false, startTime: 2.0, duration: 0.3, locale: "fr-FR")
-        messageBuffer.updateMessage(text: "Third", isFinal: true, startTime: 3.0, duration: 0.7, locale: "es-ES")
+    func testAddMultipleMessages() async {
+        await messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Second", isFinal: false, startTime: 2.0, duration: 0.3, locale: "fr-FR")
+        await messageBuffer.updateMessage(text: "Third", isFinal: true, startTime: 3.0, duration: 0.7, locale: "es-ES")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 3)
         XCTAssertEqual(messages[0].text, "First")
         XCTAssertEqual(messages[1].text, "Second")
         XCTAssertEqual(messages[2].text, "Third")
     }
 
-    func testInitiallyEmpty() {
-        let messages = messageBuffer.getMessages()
+    func testInitiallyEmpty() async {
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 0)
     }
 
     // MARK: - Message Update Tests
 
-    func testUpdateExistingMessage() {
+    func testUpdateExistingMessage() async {
         // Add initial message
-        messageBuffer.updateMessage(text: "Hello", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Hello", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
 
         // Update the same message (same startTime within tolerance)
-        messageBuffer.updateMessage(text: "Hello world", isFinal: true, startTime: 1.05, duration: 0.8, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Hello world", isFinal: true, startTime: 1.05, duration: 0.8, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1) // Should still be one message
         XCTAssertEqual(messages[0].text, "Hello world") // Text updated
         XCTAssertEqual(messages[0].isFinal, true) // Status updated
@@ -64,24 +64,24 @@ final class MessageBufferTests: XCTestCase {
         XCTAssertEqual(messages[0].startTime, 1.0, accuracy: 0.001) // StartTime remains original
     }
 
-    func testUpdateWithinTimeTolerance() {
-        messageBuffer.updateMessage(text: "Original", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+    func testUpdateWithinTimeTolerance() async {
+        await messageBuffer.updateMessage(text: "Original", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
 
         // Update with startTime within 0.1 tolerance (1.09 is within 0.1 of 1.0)
-        messageBuffer.updateMessage(text: "Updated", isFinal: true, startTime: 1.09, duration: 0.8, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Updated", isFinal: true, startTime: 1.09, duration: 0.8, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].text, "Updated")
     }
 
-    func testUpdateOutsideTimeTolerance() {
-        messageBuffer.updateMessage(text: "First", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+    func testUpdateOutsideTimeTolerance() async {
+        await messageBuffer.updateMessage(text: "First", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
 
         // Add with startTime outside 0.1 tolerance and after First ends (1.6 is after 1.5)
-        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 1.6, duration: 0.8, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 1.6, duration: 0.8, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 2) // Should be two separate messages
         XCTAssertEqual(messages[0].text, "First")
         XCTAssertEqual(messages[1].text, "Second")
@@ -89,13 +89,13 @@ final class MessageBufferTests: XCTestCase {
 
     // MARK: - Chronological Ordering Tests
 
-    func testMessagesAreOrderedByStartTime() {
+    func testMessagesAreOrderedByStartTime() async {
         // Add messages out of chronological order
-        messageBuffer.updateMessage(text: "Third", isFinal: true, startTime: 3.0, duration: 0.5, locale: "en-US")
-        messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
-        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 2.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Third", isFinal: true, startTime: 3.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 2.0, duration: 0.5, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 3)
         XCTAssertEqual(messages[0].text, "First")
         XCTAssertEqual(messages[0].startTime, 1.0, accuracy: 0.001)
@@ -105,16 +105,16 @@ final class MessageBufferTests: XCTestCase {
         XCTAssertEqual(messages[2].startTime, 3.0, accuracy: 0.001)
     }
 
-    func testOrderingMaintainedAfterUpdates() {
+    func testOrderingMaintainedAfterUpdates() async {
         // Add messages in order
-        messageBuffer.updateMessage(text: "First", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
-        messageBuffer.updateMessage(text: "Second", isFinal: false, startTime: 2.0, duration: 0.5, locale: "en-US")
-        messageBuffer.updateMessage(text: "Third", isFinal: false, startTime: 3.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "First", isFinal: false, startTime: 1.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Second", isFinal: false, startTime: 2.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Third", isFinal: false, startTime: 3.0, duration: 0.5, locale: "en-US")
 
         // Update middle message
-        messageBuffer.updateMessage(text: "Second Updated", isFinal: true, startTime: 2.0, duration: 0.8, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Second Updated", isFinal: true, startTime: 2.0, duration: 0.8, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 3)
         XCTAssertEqual(messages[0].text, "First")
         XCTAssertEqual(messages[1].text, "Second Updated") // Updated but still in correct position
@@ -123,21 +123,21 @@ final class MessageBufferTests: XCTestCase {
 
     // MARK: - EndTime Calculation Tests
 
-    func testEndTimeCalculation() {
-        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.5, duration: 2.3, locale: "en-US")
+    func testEndTimeCalculation() async {
+        await messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.5, duration: 2.3, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
 
         let expectedEndTime = 1.5 + 2.3 // 3.8
         XCTAssertEqual(messages[0].endTime, expectedEndTime, accuracy: 0.001)
     }
 
-    func testEndTimeAfterUpdate() {
-        messageBuffer.updateMessage(text: "Test", isFinal: false, startTime: 1.0, duration: 1.0, locale: "en-US")
-        messageBuffer.updateMessage(text: "Test Updated", isFinal: true, startTime: 1.0, duration: 2.5, locale: "en-US")
+    func testEndTimeAfterUpdate() async {
+        await messageBuffer.updateMessage(text: "Test", isFinal: false, startTime: 1.0, duration: 1.0, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Test Updated", isFinal: true, startTime: 1.0, duration: 2.5, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
 
         let expectedEndTime = 1.0 + 2.5 // 3.5
@@ -146,34 +146,38 @@ final class MessageBufferTests: XCTestCase {
 
     // MARK: - Clear Messages Tests
 
-    func testClearMessages() {
-        messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
-        messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 2.0, duration: 0.5, locale: "en-US")
+    func testClearMessages() async {
+        await messageBuffer.updateMessage(text: "First", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Second", isFinal: true, startTime: 2.0, duration: 0.5, locale: "en-US")
 
-        XCTAssertEqual(messageBuffer.getMessages().count, 2)
+        let count1 = await messageBuffer.getMessages().count
+        XCTAssertEqual(count1, 2)
 
-        messageBuffer.clearMessages()
-        XCTAssertEqual(messageBuffer.getMessages().count, 0)
+        await messageBuffer.clearMessages()
+        let count2 = await messageBuffer.getMessages().count
+        XCTAssertEqual(count2, 0)
     }
 
-    func testClearEmptyBuffer() {
-        XCTAssertEqual(messageBuffer.getMessages().count, 0)
+    func testClearEmptyBuffer() async {
+        let count1 = await messageBuffer.getMessages().count
+        XCTAssertEqual(count1, 0)
 
-        messageBuffer.clearMessages() // Should not crash
-        XCTAssertEqual(messageBuffer.getMessages().count, 0)
+        await messageBuffer.clearMessages() // Should not crash
+        let count2 = await messageBuffer.getMessages().count
+        XCTAssertEqual(count2, 0)
     }
 
     // MARK: - Language Agnostic Tests
 
-    func testLanguageAgnostic() {
+    func testLanguageAgnostic() async {
         // Should work with any locale string
-        messageBuffer.updateMessage(text: "English", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
-        messageBuffer.updateMessage(text: "French", isFinal: true, startTime: 2.0, duration: 0.5, locale: "fr-FR")
-        messageBuffer.updateMessage(text: "Spanish", isFinal: true, startTime: 3.0, duration: 0.5, locale: "es-ES")
-        messageBuffer.updateMessage(text: "Chinese", isFinal: true, startTime: 4.0, duration: 0.5, locale: "zh-CN")
-        messageBuffer.updateMessage(text: "Custom", isFinal: true, startTime: 5.0, duration: 0.5, locale: "custom-locale")
+        await messageBuffer.updateMessage(text: "English", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "French", isFinal: true, startTime: 2.0, duration: 0.5, locale: "fr-FR")
+        await messageBuffer.updateMessage(text: "Spanish", isFinal: true, startTime: 3.0, duration: 0.5, locale: "es-ES")
+        await messageBuffer.updateMessage(text: "Chinese", isFinal: true, startTime: 4.0, duration: 0.5, locale: "zh-CN")
+        await messageBuffer.updateMessage(text: "Custom", isFinal: true, startTime: 5.0, duration: 0.5, locale: "custom-locale")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 5)
         XCTAssertEqual(messages[0].locale, "en-US")
         XCTAssertEqual(messages[1].locale, "fr-FR")
@@ -184,62 +188,62 @@ final class MessageBufferTests: XCTestCase {
 
     // MARK: - Edge Cases
 
-    func testZeroDuration() {
-        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: 0.0, locale: "en-US")
+    func testZeroDuration() async {
+        await messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: 0.0, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].endTime, 1.0, accuracy: 0.001)
     }
 
-    func testNegativeDuration() {
-        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: -0.5, locale: "en-US")
+    func testNegativeDuration() async {
+        await messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: -0.5, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].endTime, 0.5, accuracy: 0.001) // 1.0 + (-0.5)
     }
 
-    func testZeroStartTime() {
-        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 0.0, duration: 1.0, locale: "en-US")
+    func testZeroStartTime() async {
+        await messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 0.0, duration: 1.0, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].startTime, 0.0, accuracy: 0.001)
         XCTAssertEqual(messages[0].endTime, 1.0, accuracy: 0.001)
     }
 
-    func testEmptyText() {
-        messageBuffer.updateMessage(text: "", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
+    func testEmptyText() async {
+        await messageBuffer.updateMessage(text: "", isFinal: true, startTime: 1.0, duration: 0.5, locale: "en-US")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].text, "")
     }
 
-    func testEmptyLocale() {
-        messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: 0.5, locale: "")
+    func testEmptyLocale() async {
+        await messageBuffer.updateMessage(text: "Test", isFinal: true, startTime: 1.0, duration: 0.5, locale: "")
 
-        let messages = messageBuffer.getMessages()
+        let messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 1)
         XCTAssertEqual(messages[0].locale, "")
     }
 
     // MARK: - Realistic Speech Recognition Scenarios
 
-    func testOldPendingMessageReplacementScenario() {
+    func testOldPendingMessageReplacementScenario() async {
         // Scenario: After silence, analyzer first detects something far back in time as pending,
         // then corrects with actual speech start time
 
         // Step 1: Current time is around 10 seconds, someone starts talking
-        messageBuffer.updateMessage(text: "Hello", isFinal: false, startTime: 10.0, duration: 0.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Hello", isFinal: false, startTime: 10.0, duration: 0.5, locale: "en-US")
 
         // Step 2: Analyzer initially reports some phantom detection from way back during silence
         // This is a pending message with start time much earlier
-        messageBuffer.updateMessage(text: "Hmm", isFinal: false, startTime: 5.0, duration: 1.0, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Hmm", isFinal: false, startTime: 5.0, duration: 1.0, locale: "en-US")
 
         // At this point we should have 2 messages (they're outside 0.1s tolerance)
-        var messages = messageBuffer.getMessages()
+        var messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 2)
         XCTAssertEqual(messages[0].startTime, 5.0, accuracy: 0.001) // Chronologically first
         XCTAssertEqual(messages[0].text, "Hmm")
@@ -249,10 +253,10 @@ final class MessageBufferTests: XCTestCase {
         // Step 3: Update comes in that corrects the phantom detection - same text but proper start time
         // This should replace the old pending "Hmm" message even though start time is very different
         // Use a start time that doesn't overlap with "Hello" (which ends at 10.5)
-        messageBuffer.updateMessage(text: "Hmm", isFinal: false, startTime: 11.0, duration: 0.8, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Hmm", isFinal: false, startTime: 11.0, duration: 0.8, locale: "en-US")
 
         // Now we should still have 2 messages, but the "Hmm" should be updated to the correct time
-        messages = messageBuffer.getMessages()
+        messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 2)
 
         // The messages should now be in the correct order
@@ -263,27 +267,27 @@ final class MessageBufferTests: XCTestCase {
         XCTAssertEqual(messages[1].duration, 0.8, accuracy: 0.001) // Duration updated too
     }
 
-    func testPendingMessageTextMatchingWithTimeCorrection() {
+    func testPendingMessageTextMatchingWithTimeCorrection() async {
         // Similar scenario but focusing on text matching for pending messages
 
         // Add some established final messages
-        messageBuffer.updateMessage(text: "Previous", isFinal: true, startTime: 8.0, duration: 1.0, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Previous", isFinal: true, startTime: 8.0, duration: 1.0, locale: "en-US")
 
         // Phantom detection from way back
-        messageBuffer.updateMessage(text: "Let me jump in", isFinal: false, startTime: 2.0, duration: 8.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Let me jump in", isFinal: false, startTime: 2.0, duration: 8.5, locale: "en-US")
 
         // Current actual speech
-        messageBuffer.updateMessage(text: "Let me jump in and tell you", isFinal: false, startTime: 10.0, duration: 6.5, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Let me jump in and tell you", isFinal: false, startTime: 10.0, duration: 6.5, locale: "en-US")
 
         // Should have 3 messages at this point
-        var messages = messageBuffer.getMessages()
+        var messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 2)
 
         // Correction comes in: same text "Testing" but with proper timing near current speech
-        messageBuffer.updateMessage(text: "Let me jump in and tell you something", isFinal: true, startTime: 10.5, duration: 7.7, locale: "en-US")
+        await messageBuffer.updateMessage(text: "Let me jump in and tell you something", isFinal: true, startTime: 10.5, duration: 7.7, locale: "en-US")
 
         // Should still have 3 messages, but "Testing" moved to correct position
-        messages = messageBuffer.getMessages()
+        messages = await messageBuffer.getMessages()
         XCTAssertEqual(messages.count, 2)
 
         // Verify chronological order and that "Testing" was moved
