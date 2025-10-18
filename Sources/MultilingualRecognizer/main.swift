@@ -294,13 +294,18 @@ func main() async {
     let remoteTranslationProcessor = TranslationProcessor(nextProcessor: broadcastProcessor)
     let remoteLanguageFilter = LanguageFilterProcessor(nextProcessor: remoteTranslationProcessor)
 
-    // Create audio service and setup UI
+    // Create audio service and setup coordinator with dependency injection
     let audioService = AudioEngineService()
-    let audioSetupUI = AudioSetupUI(audioService: audioService)
+    let deviceSelector = TerminalDeviceSelector()
+    let audioSetupCoordinator = AudioSetupCoordinator(
+        audioService: audioService,
+        deviceSelector: deviceSelector,
+        ui: ui
+    )
 
     // Run device selection
     do {
-        try await audioSetupUI.runDeviceSelection()
+        try await audioSetupCoordinator.runDeviceSelection()
     } catch {
         ui.status("❌ Audio setup failed: \(error)")
         return
