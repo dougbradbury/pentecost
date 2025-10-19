@@ -3,9 +3,10 @@ import Foundation
 @available(macOS 26.0, *)
 final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
     private let baseDirectory: URL
-    private let sessionTimestamp: String
+    private var sessionTimestamp: String
     private var openFiles: [String: FileHandle] = [:]
     private let fileManager = FileManager.default
+    private let dateFormatter: DateFormatter
 
     init() {
         // Read MEETING_SUMMARY_DIR environment variable
@@ -17,10 +18,12 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
 
         self.baseDirectory = URL(fileURLWithPath: summaryDirPath)
 
-        // Capture session start time for filename timestamp
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        self.sessionTimestamp = formatter.string(from: Date())
+        // Set up date formatter for timestamps
+        self.dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+
+        // Capture initial session start time for filename timestamp
+        self.sessionTimestamp = dateFormatter.string(from: Date())
     }
 
     deinit {
@@ -103,5 +106,40 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
         let minutes = Int(time) / 60
         let seconds = time.truncatingRemainder(dividingBy: 60)
         return String(format: "%02d:%05.2f", minutes, seconds)
+    }
+
+    // MARK: - Public API
+
+    /// Start a new transcript file with a fresh timestamp
+    /// Closes existing file handles and creates new files for subsequent writes
+    /// - Returns: The new session timestamp used for the filename
+    @discardableResult
+    func startNewTranscriptFile() async -> String {
+        // Close all existing file handles
+        closeAllFiles()
+
+        // Generate new session timestamp
+        let newTimestamp = dateFormatter.string(from: Date())
+        sessionTimestamp = newTimestamp
+
+        return newTimestamp
+    }
+
+    /// Close all currently open transcript files
+    func closeAllFiles() {
+        for (locale, handle) in openFiles {
+            do {
+                try handle.synchronize() // Flush to disk
+                try handle.close()
+            } catch {
+                print("Error closing transcript file for \(locale): \(error)")
+            }
+        }
+        openFiles.removeAll()
+    }
+
+    /// Get the current session timestamp
+    func getCurrentSessionTimestamp() -> String {
+        return sessionTimestamp
     }
 }
