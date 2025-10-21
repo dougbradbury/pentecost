@@ -21,7 +21,8 @@ final class TerminalRenderer: @unchecked Sendable {
 
     // Dynamically calculate column width based on current terminal width
     private var columnWidth: Int {
-        return (terminalWidth - 4) / 2  // -4 for separator and margins
+        let width = (terminalWidth - 4) / 2  // -4 for separator and margins
+        return max(20, width)  // Ensure minimum width of 20
     }
 
     private var rightMargin: Int { leftMargin + columnWidth + 2 } // +2 for separator
@@ -48,7 +49,8 @@ final class TerminalRenderer: @unchecked Sendable {
     private func getTerminalWidth() -> Int {
         var winsize = winsize()
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, &winsize) == 0 {
-            return Int(winsize.ws_col)
+            let width = Int(winsize.ws_col)
+            return width > 0 ? width : 120  // Ensure positive value
         }
         return 120 // fallback if detection fails
     }

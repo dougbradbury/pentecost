@@ -162,6 +162,83 @@ func setupSignalHandling() {
     }
 }
 
+// MARK: - Keyboard Input Handling
+
+/// Set up raw terminal mode to capture individual keystrokes
+func enableRawMode() -> termios? {
+    var originalTermios = termios()
+    guard tcgetattr(STDIN_FILENO, &originalTermios) == 0 else {
+        return nil
+    }
+
+    var raw = originalTermios
+    raw.c_lflag &= ~(UInt(ICANON | ECHO))
+    raw.c_cc.16 = 0  // VMIN = 0 (non-blocking)
+    raw.c_cc.17 = 0  // VTIME = 0
+
+    guard tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == 0 else {
+        return nil
+    }
+
+    return originalTermios
+}
+
+/// Restore terminal to original mode
+func disableRawMode(_ originalTermios: termios) {
+    var term = originalTermios
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &term)
+}
+
+/// Monitor keyboard input for Ctrl+N command
+@available(macOS 26.0, *)
+func startKeyboardMonitoring(
+    transcriptProcessor: TranscriptFileProcessor,
+    terminalProcessor: TwoColumnTerminalProcessor,
+    ui: UserInterface
+) -> Task<Void, Never> {
+    return Task {
+        var buffer = [UInt8](repeating: 0, count: 16)
+
+        while !shutdownRequested {
+            do {
+                // Non-blocking read with timeout
+                try await Task.sleep(for: .milliseconds(100))
+
+                // Read from stdin using Darwin's read (non-blocking)
+                let bytesRead = read(STDIN_FILENO, &buffer, buffer.count)
+
+                guard bytesRead > 0 else { continue }
+
+                // Process each byte
+                for i in 0..<bytesRead {
+                    let byte = buffer[i]
+                    // Ctrl+N is ASCII 14 (0x0E)
+                    if byte == 14 {
+                        await handleNewTranscriptCommand(
+                            transcriptProcessor: transcriptProcessor,
+                            terminalProcessor: terminalProcessor,
+                            ui: ui
+                        )
+                    }
+                }
+            } catch {
+                // Sleep interrupted, continue
+            }
+        }
+    }
+}
+
+/// Handle the Ctrl+N command to start a new transcript file
+@available(macOS 26.0, *)
+func handleNewTranscriptCommand(
+    transcriptProcessor: TranscriptFileProcessor,
+    terminalProcessor: TwoColumnTerminalProcessor,
+    ui: UserInterface
+) async {
+    let newTimestamp = await transcriptProcessor.startNewTranscriptFile()
+    await terminalProcessor.clear()
+}
+
 @available(macOS 26.0, *)
 func performCleanShutdown(
     ui: UserInterface,
@@ -171,12 +248,23 @@ func performCleanShutdown(
     inputEnglishRecognizer: SingleLanguageSpeechRecognizer,
     inputFrenchRecognizer: SingleLanguageSpeechRecognizer,
     remoteEnglishRecognizer: SingleLanguageSpeechRecognizer,
-    remoteFrenchRecognizer: SingleLanguageSpeechRecognizer
+    remoteFrenchRecognizer: SingleLanguageSpeechRecognizer,
+    keyboardMonitorTask: Task<Void, Never>?,
+    originalTermios: termios?
 ) async {
     // Clear screen for clean shutdown message display
     print("\u{001B}[2J\u{001B}[H", terminator: "")
 
     ui.status("🛑 Shutting down gracefully...")
+
+    // Cancel keyboard monitoring task
+    keyboardMonitorTask?.cancel()
+
+    // Restore terminal mode
+    if let originalTermios = originalTermios {
+        disableRawMode(originalTermios)
+    }
+
     statusTimer.invalidate()
 
     // Stop audio engines first to prevent new audio processing
@@ -329,6 +417,21 @@ func main() async {
         return
     }
 
+    // Enable raw terminal mode for keyboard input
+    let originalTermios = enableRawMode()
+    if originalTermios == nil {
+        ui.status("⚠️ Could not enable raw terminal mode - keyboard shortcuts disabled")
+    } else {
+        ui.status("⌨️ Keyboard shortcuts enabled: Ctrl+N to start new transcript")
+    }
+
+    // Start keyboard monitoring task
+    let keyboardMonitorTask = startKeyboardMonitoring(
+        transcriptProcessor: transcriptProcessor,
+        terminalProcessor: terminalProcessor,
+        ui: ui
+    )
+
     // Status updates every 30 seconds
     let statusTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
         Task { @MainActor in
@@ -354,7 +457,9 @@ func main() async {
         inputEnglishRecognizer: inputEnglishRecognizer,
         inputFrenchRecognizer: inputFrenchRecognizer,
         remoteEnglishRecognizer: remoteEnglishRecognizer,
-        remoteFrenchRecognizer: remoteFrenchRecognizer
+        remoteFrenchRecognizer: remoteFrenchRecognizer,
+        keyboardMonitorTask: keyboardMonitorTask,
+        originalTermios: originalTermios
     )
 }
 

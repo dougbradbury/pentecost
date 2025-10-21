@@ -73,5 +73,12 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
         let frenchMessages = await frenchBuffer.getMessages()
         terminalRenderer.render(englishMessages: englishMessages, frenchMessages: frenchMessages)
     }
+
+    /// Clear all message buffers and the screen
+    func clear() async {
+        await englishBuffer.clearMessages()
+        await frenchBuffer.clearMessages()
+        await render()
+    }
 }
 
