@@ -29,7 +29,7 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         try await Task.sleep(for: .milliseconds(1000))
 
         ui.status("🔧 Creating French recognizer...")
-        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-FR")
+        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
 
         ui.status("🔧 Setting up French transcriber...")
         try await frenchRecognizer.setUpTranscriber()
@@ -94,7 +94,7 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         try await Task.sleep(for: .milliseconds(1000))
 
         ui.status("🔧 Creating French recognizer for REMOTE...")
-        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-FR")
+        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
 
         ui.status("🔧 Setting up French transcriber for REMOTE...")
         try await frenchRecognizer.setUpTranscriber()
@@ -235,7 +235,7 @@ func handleNewTranscriptCommand(
     terminalProcessor: TwoColumnTerminalProcessor,
     ui: UserInterface
 ) async {
-    let newTimestamp = await transcriptProcessor.startNewTranscriptFile()
+    _ = await transcriptProcessor.startNewTranscriptFile()
     await terminalProcessor.clear()
 }
 

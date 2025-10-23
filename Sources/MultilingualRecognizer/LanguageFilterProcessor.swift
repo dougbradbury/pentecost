@@ -85,7 +85,7 @@ final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
         switch locale {
         case "en-US", "en":
             return "en"
-        case "fr-FR", "fr":
+        case "fr-CA", "fr":
             return "fr"
         default:
             return locale

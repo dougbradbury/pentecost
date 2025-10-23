@@ -60,7 +60,7 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
         switch locale {
         case "en-US", "en":
             await englishBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
-        case "fr-FR", "fr":
+        case "fr-CA", "fr":
             await frenchBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
         default:
             break

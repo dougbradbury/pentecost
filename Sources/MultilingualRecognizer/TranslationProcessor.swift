@@ -30,10 +30,10 @@ final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
 
         switch locale {
         case "en-US", "en":
-            targetLocale = "fr-FR"
+            targetLocale = "fr-CA"
             sourceLanguage = Locale.Language(identifier: "en")
             targetLanguage = Locale.Language(identifier: "fr")
-        case "fr-FR", "fr":
+        case "fr-CA", "fr":
             targetLocale = "en-US"
             sourceLanguage = Locale.Language(identifier: "fr")
             targetLanguage = Locale.Language(identifier: "en")
