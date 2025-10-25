@@ -52,11 +52,12 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         ui.status("🎤 LOCAL tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for local audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [englishRecognizer, frenchRecognizer] buffer, _ in
-            Task { @Sendable in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
+            guard let english = englishRecognizer, let french = frenchRecognizer else { return }
+            Task { @Sendable [english, french] in
                 do {
-                    try await englishRecognizer.streamAudioToTranscriber(buffer)
-                    try await frenchRecognizer.streamAudioToTranscriber(buffer)
+                    try await english.streamAudioToTranscriber(buffer)
+                    try await french.streamAudioToTranscriber(buffer)
                 } catch {
                     Task { @MainActor in
                         ui.status("❌ Error streaming LOCAL audio: \(error)")
@@ -117,11 +118,12 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         ui.status("🔊 REMOTE tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for remote audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [englishRecognizer, frenchRecognizer] buffer, _ in
-            Task { @Sendable in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
+            guard let english = englishRecognizer, let french = frenchRecognizer else { return }
+            Task { @Sendable [english, french] in
                 do {
-                    try await englishRecognizer.streamAudioToTranscriber(buffer)
-                    try await frenchRecognizer.streamAudioToTranscriber(buffer)
+                    try await english.streamAudioToTranscriber(buffer)
+                    try await french.streamAudioToTranscriber(buffer)
                 } catch {
                     Task { @MainActor in
                         ui.status("❌ Error streaming REMOTE audio: \(error)")
