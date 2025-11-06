@@ -181,6 +181,16 @@ class PentecostViewModel: ObservableObject {
 
         // Close transcript files
         transcriptProcessor?.closeAllFiles()
+        
+        // Clean up recognizers
+        inputEnglishRecognizer = nil
+        inputFrenchRecognizer = nil
+        remoteEnglishRecognizer = nil
+        remoteFrenchRecognizer = nil
+        
+        // Clean up audio engines
+        inputAudioEngine = nil
+        remoteAudioEngine = nil
 
         isRunning = false
         statusMessage = "✅ Stopped"
