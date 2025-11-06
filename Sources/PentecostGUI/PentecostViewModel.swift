@@ -16,6 +16,9 @@ class PentecostViewModel: ObservableObject {
     @Published var selectedRemoteDevice: String = "Not selected"
     @Published var localDeviceFormat: String = ""
     @Published var remoteDeviceFormat: String = ""
+    @Published var availableDevices: [AudioDevice] = []
+    @Published var selectedLocalDeviceID: AudioDeviceID?
+    @Published var selectedRemoteDeviceID: AudioDeviceID?
 
     private var audioService: AudioEngineService?
     private var inputAudioEngine: AVAudioEngine?
@@ -33,6 +36,20 @@ class PentecostViewModel: ObservableObject {
             fileLogger = try FileLogger()
         } catch {
             print("⚠️ Failed to initialize file logger: \(error)")
+        }
+        loadAvailableDevices()
+    }
+
+    func loadAvailableDevices() {
+        let deviceManager = AudioDeviceManager()
+        availableDevices = (try? deviceManager.getInputDevices()) ?? []
+
+        // Set defaults to first two devices if available
+        if availableDevices.count > 0 {
+            selectedLocalDeviceID = availableDevices[0].deviceID
+        }
+        if availableDevices.count > 1 {
+            selectedRemoteDeviceID = availableDevices[1].deviceID
         }
     }
 
@@ -71,7 +88,7 @@ class PentecostViewModel: ObservableObject {
 
         // Device selection
         statusMessage = "🎤 Setting up audio devices..."
-        let deviceSelector = GUIDeviceSelector()
+        let deviceSelector = GUIDeviceSelector(viewModel: self)
         let audioSetupCoordinator = AudioSetupCoordinator(
             audioService: audioService,
             deviceSelector: deviceSelector,
@@ -287,7 +304,7 @@ class PentecostViewModel: ObservableObject {
             let deviceFormat = inputNode.outputFormat(forBus: 0)
             print("🔍 LOCAL device format: \(deviceFormat)")
             print("🔍 Sample rate: \(deviceFormat.sampleRate)Hz, Channels: \(deviceFormat.channelCount)")
-            
+
             guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
                                                sampleRate: deviceFormat.sampleRate,
                                                channels: 1,
@@ -487,12 +504,25 @@ final class GUIRemoteSpeechProcessor: @unchecked Sendable, SpeechProcessor {
 
 @available(macOS 26.0, *)
 final class GUIDeviceSelector: @unchecked Sendable, DeviceSelector {
+    weak var viewModel: PentecostViewModel?
+
+    init(viewModel: PentecostViewModel? = nil) {
+        self.viewModel = viewModel
+    }
+
     func displayInputDevices(_ devices: [AudioDevice]) async {
         // GUI doesn't need to display list
     }
 
     func selectFirstInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
-        // For GUI, just select the first device (typically built-in mic)
+        // Use the device selected in the ViewModel if available
+        if let viewModel = await MainActor.run(body: { viewModel }),
+           let selectedID = await MainActor.run(body: { viewModel.selectedLocalDeviceID }),
+           let device = devices.first(where: { $0.deviceID == selectedID }) {
+            return device
+        }
+
+        // Fallback to first device
         guard let first = devices.first else {
             throw AudioError.deviceError("No input devices available")
         }
@@ -500,7 +530,14 @@ final class GUIDeviceSelector: @unchecked Sendable, DeviceSelector {
     }
 
     func selectSecondInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
-        // Select second device if available (for BlackHole/remote audio)
+        // Use the device selected in the ViewModel if available
+        if let viewModel = await MainActor.run(body: { viewModel }),
+           let selectedID = await MainActor.run(body: { viewModel.selectedRemoteDeviceID }),
+           let device = devices.first(where: { $0.deviceID == selectedID }) {
+            return device
+        }
+
+        // Fallback to second device
         if devices.count > 1 {
             return devices[1]
         }

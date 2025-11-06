@@ -183,47 +183,84 @@ struct ControlsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Device info bar
-            HStack {
-                HStack(spacing: 4) {
-                    Image(systemName: "🎤")
-                        .foregroundColor(.blue)
-                    Text("Local:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(viewModel.selectedLocalDevice)
-                        .font(.caption)
-                        .lineLimit(1)
-                    if !viewModel.localDeviceFormat.isEmpty {
-                        Text("(\(viewModel.localDeviceFormat))")
-                            .font(.caption2)
+            // Device selection (only shown when not running)
+            if !viewModel.isRunning {
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("🎤 Local Device:")
+                            .font(.caption)
                             .foregroundColor(.secondary)
+                        Picker("", selection: $viewModel.selectedLocalDeviceID) {
+                            ForEach(viewModel.availableDevices, id: \.deviceID) { device in
+                                Text(device.name).tag(Optional(device.deviceID))
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 300)
+                    }
+
+                    HStack {
+                        Text("🔊 Remote Device:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Picker("", selection: $viewModel.selectedRemoteDeviceID) {
+                            ForEach(viewModel.availableDevices, id: \.deviceID) { device in
+                                Text(device.name).tag(Optional(device.deviceID))
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 300)
                     }
                 }
+                .padding()
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
 
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Image(systemName: "🔊")
-                        .foregroundColor(.green)
-                    Text("Remote:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(viewModel.selectedRemoteDevice)
-                        .font(.caption)
-                        .lineLimit(1)
-                    if !viewModel.remoteDeviceFormat.isEmpty {
-                        Text("(\(viewModel.remoteDeviceFormat))")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
+                Divider()
             }
-            .padding(.horizontal)
-            .padding(.vertical, 4)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
 
-            Divider()
+            // Device info bar (shown when running)
+            if viewModel.isRunning {
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "🎤")
+                            .foregroundColor(.blue)
+                        Text("Local:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(viewModel.selectedLocalDevice)
+                            .font(.caption)
+                            .lineLimit(1)
+                        if !viewModel.localDeviceFormat.isEmpty {
+                            Text("(\(viewModel.localDeviceFormat))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "🔊")
+                            .foregroundColor(.green)
+                        Text("Remote:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(viewModel.selectedRemoteDevice)
+                            .font(.caption)
+                            .lineLimit(1)
+                        if !viewModel.remoteDeviceFormat.isEmpty {
+                            Text("(\(viewModel.remoteDeviceFormat))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 4)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+
+                Divider()
+            }
 
             // Control buttons
             HStack(spacing: 16) {

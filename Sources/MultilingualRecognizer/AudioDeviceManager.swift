@@ -27,8 +27,10 @@ public struct AudioDevice {
 @available(macOS 26.0, *)
 public final class AudioDeviceManager {
 
+    public init() {}
+
     /// Enumerate all available audio devices
-    func getAllAudioDevices() throws -> [AudioDevice] {
+    public func getAllAudioDevices() throws -> [AudioDevice] {
         var devices: [AudioDevice] = []
 
         // Get all device IDs
@@ -52,12 +54,12 @@ public final class AudioDeviceManager {
     }
 
     /// Get only input devices (devices with input channels)
-    func getInputDevices() throws -> [AudioDevice] {
+    public func getInputDevices() throws -> [AudioDevice] {
         return try getAllAudioDevices().filter { $0.hasInput }
     }
 
     /// Get only output devices (devices with output channels)
-    func getOutputDevices() throws -> [AudioDevice] {
+    public func getOutputDevices() throws -> [AudioDevice] {
         return try getAllAudioDevices().filter { $0.hasOutput }
     }
 
