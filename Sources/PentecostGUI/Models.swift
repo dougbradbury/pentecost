@@ -7,7 +7,7 @@ struct TranscriptionMessage: Identifiable {
     let translation: String?
     let isEnglish: Bool
     let isLocal: Bool // true for local/microphone, false for remote/system
-    
+
     init(id: UUID = UUID(), timestamp: Date = Date(), text: String, translation: String? = nil, isEnglish: Bool, isLocal: Bool) {
         self.id = id
         self.timestamp = timestamp

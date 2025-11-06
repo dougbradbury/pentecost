@@ -9,7 +9,7 @@ public final class AudioEngineService {
     private var secondInputDevice: AudioDevice?
 
     public init() {}
-    
+
     /// Get all available input devices
     public func getInputDevices() throws -> [AudioDevice] {
         return try deviceManager.getInputDevices()

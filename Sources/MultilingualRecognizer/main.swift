@@ -303,7 +303,7 @@ func main() async {
     } catch {
         print("⚠️ Failed to initialize file logger: \(error)")
     }
-    
+
     let ui: UserInterface = TerminalUI()
 
     // Display beautiful Pentecost ASCII art and branding

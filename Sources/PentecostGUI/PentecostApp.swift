@@ -6,11 +6,11 @@ import AVFoundation
 @main
 struct PentecostApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .frame(minWidth: 1200, minHeight: 800)
+                .frame(minWidth: 900, minHeight: 700)
         }
         .commands {
             CommandGroup(replacing: .newItem) { }
@@ -26,11 +26,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await requestPermissions()
         }
     }
-    
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true
     }
-    
+
     private func requestPermissions() async {
         // Request speech recognition permission
         let speechAuth = await withCheckedContinuation { continuation in
@@ -38,18 +38,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 continuation.resume(returning: status)
             }
         }
-        
+
         if speechAuth != .authorized {
             print("❌ Speech recognition not authorized: \(speechAuth.rawValue)")
         }
-        
+
         // Request microphone permission
         let micPermission = await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }
         }
-        
+
         if !micPermission {
             print("❌ Microphone permission denied")
         }

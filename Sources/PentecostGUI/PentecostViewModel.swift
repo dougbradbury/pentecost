@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 @preconcurrency import AVFoundation
 @preconcurrency import Speech
+import Translation
 import PentecostCore
 
 @available(macOS 26.0, *)
@@ -11,18 +12,20 @@ class PentecostViewModel: ObservableObject {
     @Published var remoteMessages: [TranscriptionMessage] = []
     @Published var statusMessage: String = "Ready to start"
     @Published var isRunning: Bool = false
-    
+    @Published var selectedLocalDevice: String = "Not selected"
+    @Published var selectedRemoteDevice: String = "Not selected"
+
     private var audioService: AudioEngineService?
     private var inputAudioEngine: AVAudioEngine?
     private var remoteAudioEngine: AVAudioEngine?
-    
+
     private var inputEnglishRecognizer: SingleLanguageSpeechRecognizer?
     private var inputFrenchRecognizer: SingleLanguageSpeechRecognizer?
     private var remoteEnglishRecognizer: SingleLanguageSpeechRecognizer?
     private var remoteFrenchRecognizer: SingleLanguageSpeechRecognizer?
-    
+
     private var fileLogger: FileLogger?
-    
+
     init() {
         do {
             fileLogger = try FileLogger()
@@ -30,40 +33,40 @@ class PentecostViewModel: ObservableObject {
             print("⚠️ Failed to initialize file logger: \(error)")
         }
     }
-    
+
     func start() async {
         statusMessage = "🔐 Checking permissions..."
-        
+
         // Request permissions (these need to run without MainActor to avoid crashes)
         let speechAuth = await Self.requestSpeechPermission()
-        
+
         guard speechAuth == .authorized else {
             statusMessage = "❌ Speech recognition not authorized"
             return
         }
-        
+
         let micPermission = await Self.requestMicrophonePermission()
-        
+
         guard micPermission else {
             statusMessage = "❌ Microphone permission denied"
             return
         }
-        
-        
+
+
         statusMessage = "✅ Permissions granted"
         fileLogger?.log("✅ All permissions granted")
-        
+
         // Initialize audio service
         let audioService = AudioEngineService()
         self.audioService = audioService
-        
+
         // Create UI and processor interfaces
         let ui = GUIUserInterface(viewModel: self)
-        
+
         // Create processors
         let localProcessor = GUILocalSpeechProcessor(viewModel: self)
         let remoteProcessor = GUIRemoteSpeechProcessor(viewModel: self)
-        
+
         // Device selection
         statusMessage = "🎤 Setting up audio devices..."
         let deviceSelector = GUIDeviceSelector()
@@ -72,7 +75,7 @@ class PentecostViewModel: ObservableObject {
             deviceSelector: deviceSelector,
             ui: ui
         )
-        
+
         do {
             try await audioSetupCoordinator.runDeviceSelection()
             fileLogger?.log("✅ Audio devices selected")
@@ -81,11 +84,11 @@ class PentecostViewModel: ObservableObject {
             statusMessage = "❌ Audio setup failed: \(error)"
             return
         }
-        
+
         // Set up input recognition
         statusMessage = "🎙️ Setting up local recognition..."
         fileLogger?.log("🎙️ Setting up LOCAL (microphone) recognition...")
-        
+
         guard let result = await PentecostViewModel.setupInputRecognition(
             ui: ui,
             speechProcessor: localProcessor,
@@ -95,21 +98,21 @@ class PentecostViewModel: ObservableObject {
             statusMessage = "❌ Local recognition setup failed"
             return
         }
-        
+
         self.inputEnglishRecognizer = result.englishRecognizer
         self.inputFrenchRecognizer = result.frenchRecognizer
         self.inputAudioEngine = result.audioEngine
-        
+
         fileLogger?.log("✅ LOCAL recognition active")
-        
+
         // Delay before remote setup
         statusMessage = "⏳ Pausing before remote audio setup..."
         try? await Task.sleep(for: .milliseconds(1500))
-        
+
         // Set up remote recognition
         statusMessage = "🔊 Setting up remote recognition..."
         fileLogger?.log("🔊 Setting up REMOTE (system audio) recognition...")
-        
+
         guard let remoteResult = await PentecostViewModel.setupRemoteRecognition(
             ui: ui,
             speechProcessor: remoteProcessor,
@@ -119,28 +122,28 @@ class PentecostViewModel: ObservableObject {
             statusMessage = "❌ Remote recognition setup failed"
             return
         }
-        
+
         self.remoteEnglishRecognizer = remoteResult.englishRecognizer
         self.remoteFrenchRecognizer = remoteResult.frenchRecognizer
         self.remoteAudioEngine = remoteResult.audioEngine
-        
+
         fileLogger?.log("✅ REMOTE recognition active")
-        
+
         isRunning = true
         statusMessage = "🎙️ Recording... Speak now!"
     }
-    
+
     func stop() async {
         statusMessage = "🛑 Stopping..."
-        
+
         inputAudioEngine?.stop()
         remoteAudioEngine?.stop()
-        
+
         inputAudioEngine?.inputNode.removeTap(onBus: 0)
         remoteAudioEngine?.inputNode.removeTap(onBus: 0)
-        
+
         try? await Task.sleep(for: .milliseconds(100))
-        
+
         // Finish transcription
         do {
             try await inputEnglishRecognizer?.finishTranscribing()
@@ -150,22 +153,22 @@ class PentecostViewModel: ObservableObject {
         } catch {
             fileLogger?.log("⚠️ Error during transcription cleanup: \(error)")
         }
-        
+
         isRunning = false
         statusMessage = "✅ Stopped"
         fileLogger?.log("✅ Stopped successfully")
     }
-    
+
     func clearTranscripts() {
         localMessages.removeAll()
         remoteMessages.removeAll()
     }
-    
+
     func openLogsFolder() {
         let logsPath = FileManager.default.currentDirectoryPath + "/logs"
         NSWorkspace.shared.open(URL(fileURLWithPath: logsPath))
     }
-    
+
     func addMessage(_ message: TranscriptionMessage) {
         if message.isLocal {
             // Remove any previous message with same timestamp to avoid duplicates
@@ -175,10 +178,57 @@ class PentecostViewModel: ObservableObject {
             remoteMessages.removeAll { $0.timestamp == message.timestamp && $0.text == message.text }
             remoteMessages.append(message)
         }
+
+        // Translate message in background
+        Task {
+            await translateMessage(message)
+        }
     }
-    
+
+    func translateMessage(_ message: TranscriptionMessage) async {
+        do {
+            let sourceLanguage = Locale.Language(identifier: message.isEnglish ? "en" : "fr")
+            let targetLanguage = Locale.Language(identifier: message.isEnglish ? "fr" : "en")
+
+            let session = TranslationSession(installedSource: sourceLanguage, target: targetLanguage)
+            let response = try await session.translate(message.text)
+
+            // Update message with translation
+            updateMessageWithTranslation(id: message.id, translation: response.targetText)
+        } catch {
+            print("❌ Translation failed: \(error)")
+        }
+    }
+
+    func updateMessageWithTranslation(id: UUID, translation: String) {
+        // Update in local messages
+        if let index = localMessages.firstIndex(where: { $0.id == id }) {
+            let message = localMessages[index]
+            localMessages[index] = TranscriptionMessage(
+                id: message.id,
+                timestamp: message.timestamp,
+                text: message.text,
+                translation: translation,
+                isEnglish: message.isEnglish,
+                isLocal: message.isLocal
+            )
+        }
+        // Update in remote messages
+        else if let index = remoteMessages.firstIndex(where: { $0.id == id }) {
+            let message = remoteMessages[index]
+            remoteMessages[index] = TranscriptionMessage(
+                id: message.id,
+                timestamp: message.timestamp,
+                text: message.text,
+                translation: translation,
+                isEnglish: message.isEnglish,
+                isLocal: message.isLocal
+            )
+        }
+    }
+
     // MARK: - Permission Helpers (nonisolated to avoid actor issues)
-    
+
     nonisolated static func requestSpeechPermission() async -> SFSpeechRecognizerAuthorizationStatus {
         await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
@@ -186,7 +236,7 @@ class PentecostViewModel: ObservableObject {
             }
         }
     }
-    
+
     nonisolated static func requestMicrophonePermission() async -> Bool {
         await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { granted in
@@ -194,7 +244,7 @@ class PentecostViewModel: ObservableObject {
             }
         }
     }
-    
+
     // Static versions of setup functions from main.swift
     nonisolated static func setupInputRecognition(
         ui: UserInterface,
@@ -204,31 +254,37 @@ class PentecostViewModel: ObservableObject {
         do {
             ui.status("🔧 Creating English recognizer...")
             let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US")
-            
+
             ui.status("🔧 Setting up English transcriber...")
             try await englishRecognizer.setUpTranscriber()
-            
+
             ui.status("⏳ Waiting before French setup...")
             try await Task.sleep(for: .milliseconds(1000))
-            
+
             ui.status("🔧 Creating French recognizer...")
             let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
-            
+
             ui.status("🔧 Setting up French transcriber...")
             try await frenchRecognizer.setUpTranscriber()
-            
+
             let audioEngine = try audioService.createFirstAudioEngine()
-            
+
             if let device = audioService.getFirstInputDevice() {
-                ui.status("✅ LOCAL device: \(device.name)")
+                let deviceName = device.name
+                ui.status("✅ LOCAL device: \(deviceName)")
+                await MainActor.run {
+                    if let viewModel = (ui as? GUIUserInterface)?.viewModel {
+                        viewModel.selectedLocalDevice = deviceName
+                    }
+                }
             }
-            
+
             let inputNode = audioEngine.inputNode
-            
+
             guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 1, interleaved: false) else {
                 throw AudioError.formatError("Failed to create tap audio format")
             }
-            
+
             ui.status("🔌 Installing LOCAL audio tap...")
             nonisolated(unsafe) let englishRef = englishRecognizer
             nonisolated(unsafe) let frenchRef = frenchRecognizer
@@ -242,17 +298,17 @@ class PentecostViewModel: ObservableObject {
                     }
                 }
             }
-            
+
             try audioEngine.start()
             ui.status("🎙️ LOCAL audio capture active!")
-            
+
             return (englishRecognizer, frenchRecognizer, audioEngine)
         } catch {
             ui.status("❌ LOCAL audio setup error: \(error)")
             return nil
         }
     }
-    
+
     nonisolated static func setupRemoteRecognition(
         ui: UserInterface,
         speechProcessor: SpeechProcessor,
@@ -261,31 +317,37 @@ class PentecostViewModel: ObservableObject {
         do {
             ui.status("🔧 Creating English recognizer for REMOTE...")
             let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US")
-            
+
             ui.status("🔧 Setting up English transcriber for REMOTE...")
             try await englishRecognizer.setUpTranscriber()
-            
+
             ui.status("⏳ Waiting before French setup for REMOTE...")
             try await Task.sleep(for: .milliseconds(1000))
-            
+
             ui.status("🔧 Creating French recognizer for REMOTE...")
             let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
-            
+
             ui.status("🔧 Setting up French transcriber for REMOTE...")
             try await frenchRecognizer.setUpTranscriber()
-            
+
             let audioEngine = try audioService.createSecondAudioEngine()
-            
+
             if let device = audioService.getSecondInputDevice() {
-                ui.status("✅ REMOTE device: \(device.name)")
+                let deviceName = device.name
+                ui.status("✅ REMOTE device: \(deviceName)")
+                await MainActor.run {
+                    if let viewModel = (ui as? GUIUserInterface)?.viewModel {
+                        viewModel.selectedRemoteDevice = deviceName
+                    }
+                }
             }
-            
+
             let inputNode = audioEngine.inputNode
-            
+
             guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 1, interleaved: false) else {
                 throw AudioError.formatError("Failed to create tap audio format")
             }
-            
+
             ui.status("🔌 Installing REMOTE audio tap...")
             nonisolated(unsafe) let englishRef = englishRecognizer
             nonisolated(unsafe) let frenchRef = frenchRecognizer
@@ -299,10 +361,10 @@ class PentecostViewModel: ObservableObject {
                     }
                 }
             }
-            
+
             try audioEngine.start()
             ui.status("🔊 REMOTE audio capture active!")
-            
+
             return (englishRecognizer, frenchRecognizer, audioEngine)
         } catch {
             ui.status("❌ REMOTE audio setup error: \(error)")
@@ -316,11 +378,11 @@ class PentecostViewModel: ObservableObject {
 @available(macOS 26.0, *)
 final class GUIUserInterface: @unchecked Sendable, UserInterface {
     weak var viewModel: PentecostViewModel?
-    
+
     init(viewModel: PentecostViewModel) {
         self.viewModel = viewModel
     }
-    
+
     func status(_ message: String) {
         Task { @MainActor in
             viewModel?.statusMessage = message
@@ -332,23 +394,26 @@ final class GUIUserInterface: @unchecked Sendable, UserInterface {
 final class GUILocalSpeechProcessor: @unchecked Sendable, SpeechProcessor {
     weak var viewModel: PentecostViewModel?
     private var lastProcessedText: [String: Double] = [:]
-    
+
     init(viewModel: PentecostViewModel) {
         self.viewModel = viewModel
     }
-    
+
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+        print("📝 LOCAL: text='\(text)', isFinal=\(isFinal), locale=\(locale)")
         guard isFinal, !text.isEmpty else { return }
-        
+
         // Deduplicate using text and timestamp
         let key = "\(text)-\(startTime)"
         if let lastTime = lastProcessedText[key], Date().timeIntervalSince1970 - lastTime < 1.0 {
+            print("⏭️ LOCAL: Skipping duplicate")
             return
         }
         lastProcessedText[key] = Date().timeIntervalSince1970
-        
+
         let isEnglish = locale.hasPrefix("en")
-        
+
+        print("✅ LOCAL: Adding message to UI")
         Task { @MainActor in
             let message = TranscriptionMessage(
                 text: text,
@@ -365,23 +430,26 @@ final class GUILocalSpeechProcessor: @unchecked Sendable, SpeechProcessor {
 final class GUIRemoteSpeechProcessor: @unchecked Sendable, SpeechProcessor {
     weak var viewModel: PentecostViewModel?
     private var lastProcessedText: [String: Double] = [:]
-    
+
     init(viewModel: PentecostViewModel) {
         self.viewModel = viewModel
     }
-    
+
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+        print("📝 REMOTE: text='\(text)', isFinal=\(isFinal), locale=\(locale)")
         guard isFinal, !text.isEmpty else { return }
-        
+
         // Deduplicate
         let key = "\(text)-\(startTime)"
         if let lastTime = lastProcessedText[key], Date().timeIntervalSince1970 - lastTime < 1.0 {
+            print("⏭️ REMOTE: Skipping duplicate")
             return
         }
         lastProcessedText[key] = Date().timeIntervalSince1970
-        
+
         let isEnglish = locale.hasPrefix("en")
-        
+
+        print("✅ REMOTE: Adding message to UI")
         Task { @MainActor in
             let message = TranscriptionMessage(
                 text: text,
@@ -399,7 +467,7 @@ final class GUIDeviceSelector: @unchecked Sendable, DeviceSelector {
     func displayInputDevices(_ devices: [AudioDevice]) async {
         // GUI doesn't need to display list
     }
-    
+
     func selectFirstInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
         // For GUI, just select the first device (typically built-in mic)
         guard let first = devices.first else {
@@ -407,7 +475,7 @@ final class GUIDeviceSelector: @unchecked Sendable, DeviceSelector {
         }
         return first
     }
-    
+
     func selectSecondInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
         // Select second device if available (for BlackHole/remote audio)
         if devices.count > 1 {
