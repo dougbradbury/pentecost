@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for abstracting device selection UI
-protocol DeviceSelector: Sendable {
+public protocol DeviceSelector: Sendable {
     /// Display available input devices to the user
     func displayInputDevices(_ devices: [AudioDevice]) async
 

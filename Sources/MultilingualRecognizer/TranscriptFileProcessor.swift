@@ -34,11 +34,24 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
     }
 
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+        // Log all incoming messages
+        if isFinal {
+            globalLogger?.log("💾 [\(locale)] FINAL text received: '\(text)'")
+        } else {
+            // Only log occasionally to avoid spam
+            if Int.random(in: 0..<20) == 0 {
+                globalLogger?.log("⏳ [\(locale)] Partial text: '\(text)'")
+            }
+        }
+
         // Only process final messages
         guard isFinal else { return }
 
         // Skip empty text
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else {
+            globalLogger?.log("⚠️ [\(locale)] Skipping empty final text")
+            return
+        }
 
         do {
             let fileHandle = try await getFileHandle(for: locale)
@@ -48,9 +61,10 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
 
             if let data = entry.data(using: .utf8) {
                 try fileHandle.write(contentsOf: data)
+                globalLogger?.log("✅ [\(locale)] Wrote to transcript: \(entry.trimmingCharacters(in: .newlines))")
             }
         } catch {
-            print("Error writing to transcript file for \(locale): \(error)")
+            globalLogger?.log("❌ Error writing to transcript file for \(locale): \(error)")
         }
     }
 

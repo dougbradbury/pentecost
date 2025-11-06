@@ -2,6 +2,6 @@ import Foundation
 
 // MARK: - UI Protocol
 
-protocol UserInterface: Sendable {
+public protocol UserInterface: Sendable {
     func status(_ message: String)
 }

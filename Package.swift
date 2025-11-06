@@ -7,15 +7,21 @@ let package = Package(
         .macOS(.v15)
     ],
     products: [
-        .executable(name: "MultilingualRecognizer", targets: ["MultilingualRecognizer"])
+        .executable(name: "PentecostGUI", targets: ["PentecostGUI"])
     ],
     targets: [
+        .target(
+            name: "PentecostCore",
+            path: "Sources/MultilingualRecognizer",
+            exclude: ["main.swift"]
+        ),
         .executableTarget(
-            name: "MultilingualRecognizer"
+            name: "PentecostGUI",
+            dependencies: ["PentecostCore"]
         ),
         .testTarget(
-            name: "MultilingualRecognizerTests",
-            dependencies: ["MultilingualRecognizer"]
+            name: "PentecostCoreTests",
+            dependencies: ["PentecostCore"]
         )
     ]
 )

@@ -3,17 +3,17 @@ import CoreAudio
 import AVFoundation
 
 /// Represents an audio device with its properties
-struct AudioDevice {
-    let deviceID: AudioDeviceID
-    let name: String
-    let uid: String
-    let manufacturer: String
-    let hasInput: Bool
-    let hasOutput: Bool
-    let inputChannels: Int
-    let outputChannels: Int
-    let isDefaultInput: Bool
-    let isDefaultOutput: Bool
+public struct AudioDevice {
+    public let deviceID: AudioDeviceID
+    public let name: String
+    public let uid: String
+    public let manufacturer: String
+    public let hasInput: Bool
+    public let hasOutput: Bool
+    public let inputChannels: Int
+    public let outputChannels: Int
+    public let isDefaultInput: Bool
+    public let isDefaultOutput: Bool
 
     var description: String {
         let type = hasInput && hasOutput ? "I/O" : hasInput ? "Input" : "Output"
@@ -25,7 +25,7 @@ struct AudioDevice {
 
 /// Manages audio device enumeration and selection for macOS
 @available(macOS 26.0, *)
-final class AudioDeviceManager {
+public final class AudioDeviceManager {
 
     /// Enumerate all available audio devices
     func getAllAudioDevices() throws -> [AudioDevice] {

@@ -3,18 +3,20 @@ import AVFoundation
 
 /// Service that manages audio engine configuration and device selection
 @available(macOS 26.0, *)
-final class AudioEngineService {
+public final class AudioEngineService {
     private let deviceManager = AudioDeviceManager()
     private var firstInputDevice: AudioDevice?
     private var secondInputDevice: AudioDevice?
 
+    public init() {}
+    
     /// Get all available input devices
-    func getInputDevices() throws -> [AudioDevice] {
+    public func getInputDevices() throws -> [AudioDevice] {
         return try deviceManager.getInputDevices()
     }
 
     /// Set the first input device (local microphone)
-    func setFirstInputDevice(_ device: AudioDevice) throws {
+    public func setFirstInputDevice(_ device: AudioDevice) throws {
         guard device.hasInput else {
             throw AudioEngineServiceError.deviceHasNoInput
         }
@@ -22,7 +24,7 @@ final class AudioEngineService {
     }
 
     /// Set the second input device (remote/system audio)
-    func setSecondInputDevice(_ device: AudioDevice) throws {
+    public func setSecondInputDevice(_ device: AudioDevice) throws {
         guard device.hasInput else {
             throw AudioEngineServiceError.deviceHasNoInput
         }
@@ -30,17 +32,17 @@ final class AudioEngineService {
     }
 
     /// Get the first input device (local microphone)
-    func getFirstInputDevice() -> AudioDevice? {
+    public func getFirstInputDevice() -> AudioDevice? {
         return firstInputDevice
     }
 
     /// Get the second input device (remote/system audio)
-    func getSecondInputDevice() -> AudioDevice? {
+    public func getSecondInputDevice() -> AudioDevice? {
         return secondInputDevice
     }
 
     /// Create audio engine configured with the first input device (local)
-    func createFirstAudioEngine() throws -> AVAudioEngine {
+    public func createFirstAudioEngine() throws -> AVAudioEngine {
         let engine = AVAudioEngine()
 
         if let device = firstInputDevice {
@@ -51,7 +53,7 @@ final class AudioEngineService {
     }
 
     /// Create audio engine configured with the second input device (remote)
-    func createSecondAudioEngine() throws -> AVAudioEngine {
+    public func createSecondAudioEngine() throws -> AVAudioEngine {
         let engine = AVAudioEngine()
 
         if let device = secondInputDevice {
