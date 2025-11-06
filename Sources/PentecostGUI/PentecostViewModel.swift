@@ -14,6 +14,8 @@ class PentecostViewModel: ObservableObject {
     @Published var isRunning: Bool = false
     @Published var selectedLocalDevice: String = "Not selected"
     @Published var selectedRemoteDevice: String = "Not selected"
+    @Published var localDeviceFormat: String = ""
+    @Published var remoteDeviceFormat: String = ""
 
     private var audioService: AudioEngineService?
     private var inputAudioEngine: AVAudioEngine?
@@ -281,14 +283,32 @@ class PentecostViewModel: ObservableObject {
 
             let inputNode = audioEngine.inputNode
 
-            guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 48000, channels: 1, interleaved: false) else {
+            // Use the device's output format instead of hardcoded sample rate
+            let deviceFormat = inputNode.outputFormat(forBus: 0)
+            print("🔍 LOCAL device format: \(deviceFormat)")
+            print("🔍 Sample rate: \(deviceFormat.sampleRate)Hz, Channels: \(deviceFormat.channelCount)")
+            
+            guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                                               sampleRate: deviceFormat.sampleRate,
+                                               channels: 1,
+                                               interleaved: false) else {
                 throw AudioError.formatError("Failed to create tap audio format")
+            }
+            await MainActor.run {
+                if let viewModel = (ui as? GUIUserInterface)?.viewModel {
+                    viewModel.localDeviceFormat = "\(Int(deviceFormat.sampleRate))Hz, \(deviceFormat.channelCount)ch"
+                }
             }
 
             ui.status("🔌 Installing LOCAL audio tap...")
             nonisolated(unsafe) let englishRef = englishRecognizer
             nonisolated(unsafe) let frenchRef = frenchRecognizer
+            var bufferCount = 0
             inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { buffer, _ in
+                bufferCount += 1
+                if bufferCount % 100 == 0 {
+                    print("🎤 LOCAL: Captured \(bufferCount) audio buffers")
+                }
                 Task {
                     do {
                         try await englishRef.streamAudioToTranscriber(buffer)
@@ -300,7 +320,10 @@ class PentecostViewModel: ObservableObject {
             }
 
             try audioEngine.start()
-            ui.status("🎙️ LOCAL audio capture active!")
+            print("✅ LOCAL audio engine started successfully")
+            print("✅ Input node: \(inputNode)")
+            print("✅ Is running: \(audioEngine.isRunning)")
+            ui.status("🎤 LOCAL audio capture active!")
 
             return (englishRecognizer, frenchRecognizer, audioEngine)
         } catch {

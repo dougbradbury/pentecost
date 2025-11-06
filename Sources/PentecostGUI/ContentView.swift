@@ -194,6 +194,11 @@ struct ControlsView: View {
                     Text(viewModel.selectedLocalDevice)
                         .font(.caption)
                         .lineLimit(1)
+                    if !viewModel.localDeviceFormat.isEmpty {
+                        Text("(\(viewModel.localDeviceFormat))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Spacer()
@@ -207,6 +212,11 @@ struct ControlsView: View {
                     Text(viewModel.selectedRemoteDevice)
                         .font(.caption)
                         .lineLimit(1)
+                    if !viewModel.remoteDeviceFormat.isEmpty {
+                        Text("(\(viewModel.remoteDeviceFormat))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .padding(.horizontal)
