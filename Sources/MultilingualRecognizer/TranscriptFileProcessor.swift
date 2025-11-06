@@ -1,14 +1,14 @@
 import Foundation
 
 @available(macOS 26.0, *)
-final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
+public final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
     private let baseDirectory: URL
     private var sessionTimestamp: String
     private var openFiles: [String: FileHandle] = [:]
     private let fileManager = FileManager.default
     private let dateFormatter: DateFormatter
 
-    init() {
+    public init() {
         // Read MEETING_SUMMARY_DIR environment variable
         let summaryDirPath = ProcessInfo.processInfo.environment["MEETING_SUMMARY_DIR"]
             ?? URL(fileURLWithPath: NSHomeDirectory())
@@ -33,7 +33,7 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
         }
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    public func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
         // Log all incoming messages
         if isFinal {
             globalLogger?.log("💾 [\(locale)] FINAL text received: '\(text)'")
@@ -128,7 +128,7 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
     /// Closes existing file handles and creates new files for subsequent writes
     /// - Returns: The new session timestamp used for the filename
     @discardableResult
-    func startNewTranscriptFile() async -> String {
+    public func startNewTranscriptFile() async -> String {
         // Close all existing file handles
         closeAllFiles()
 
@@ -140,7 +140,7 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
     }
 
     /// Close all currently open transcript files
-    func closeAllFiles() {
+    public func closeAllFiles() {
         for (locale, handle) in openFiles {
             do {
                 try handle.synchronize() // Flush to disk

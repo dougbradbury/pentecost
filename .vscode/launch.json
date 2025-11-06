@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:pentecost}",
+            "name": "Debug PentecostGUI",
+            "target": "PentecostGUI",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug PentecostGUI"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:pentecost}",
+            "name": "Release PentecostGUI",
+            "target": "PentecostGUI",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release PentecostGUI"
+        }
+    ]
+}

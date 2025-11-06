@@ -30,6 +30,7 @@ class PentecostViewModel: ObservableObject {
     private var remoteFrenchRecognizer: SingleLanguageSpeechRecognizer?
 
     private var fileLogger: FileLogger?
+    private var transcriptProcessor: TranscriptFileProcessor?
 
     init() {
         do {
@@ -79,12 +80,17 @@ class PentecostViewModel: ObservableObject {
         let audioService = AudioEngineService()
         self.audioService = audioService
 
+        // Initialize transcript processor
+        let transcriptProcessor = TranscriptFileProcessor()
+        self.transcriptProcessor = transcriptProcessor
+        await transcriptProcessor.startNewTranscriptFile()
+
         // Create UI and processor interfaces
         let ui = GUIUserInterface(viewModel: self)
 
         // Create processors
-        let localProcessor = GUILocalSpeechProcessor(viewModel: self)
-        let remoteProcessor = GUIRemoteSpeechProcessor(viewModel: self)
+        let localProcessor = GUILocalSpeechProcessor(viewModel: self, transcriptProcessor: transcriptProcessor)
+        let remoteProcessor = GUIRemoteSpeechProcessor(viewModel: self, transcriptProcessor: transcriptProcessor)
 
         // Device selection
         statusMessage = "🎤 Setting up audio devices..."
@@ -172,6 +178,9 @@ class PentecostViewModel: ObservableObject {
         } catch {
             fileLogger?.log("⚠️ Error during transcription cleanup: \(error)")
         }
+
+        // Close transcript files
+        transcriptProcessor?.closeAllFiles()
 
         isRunning = false
         statusMessage = "✅ Stopped"
@@ -428,14 +437,28 @@ final class GUIUserInterface: @unchecked Sendable, UserInterface {
 @available(macOS 26.0, *)
 final class GUILocalSpeechProcessor: @unchecked Sendable, SpeechProcessor {
     weak var viewModel: PentecostViewModel?
+    private let transcriptProcessor: TranscriptFileProcessor?
     private var lastProcessedText: [String: Double] = [:]
 
-    init(viewModel: PentecostViewModel) {
+    init(viewModel: PentecostViewModel, transcriptProcessor: TranscriptFileProcessor? = nil) {
         self.viewModel = viewModel
+        self.transcriptProcessor = transcriptProcessor
     }
 
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
         print("📝 LOCAL: text='\(text)', isFinal=\(isFinal), locale=\(locale)")
+
+        // Write to transcript file (handles both final and partial)
+        await transcriptProcessor?.process(
+            text: text,
+            isFinal: isFinal,
+            startTime: startTime,
+            duration: duration,
+            alternativeCount: alternativeCount,
+            locale: locale
+        )
+
+        // Only show final messages in UI
         guard isFinal, !text.isEmpty else { return }
 
         // Deduplicate using text and timestamp
@@ -464,14 +487,28 @@ final class GUILocalSpeechProcessor: @unchecked Sendable, SpeechProcessor {
 @available(macOS 26.0, *)
 final class GUIRemoteSpeechProcessor: @unchecked Sendable, SpeechProcessor {
     weak var viewModel: PentecostViewModel?
+    private let transcriptProcessor: TranscriptFileProcessor?
     private var lastProcessedText: [String: Double] = [:]
 
-    init(viewModel: PentecostViewModel) {
+    init(viewModel: PentecostViewModel, transcriptProcessor: TranscriptFileProcessor? = nil) {
         self.viewModel = viewModel
+        self.transcriptProcessor = transcriptProcessor
     }
 
     func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
         print("📝 REMOTE: text='\(text)', isFinal=\(isFinal), locale=\(locale)")
+
+        // Write to transcript file (handles both final and partial)
+        await transcriptProcessor?.process(
+            text: text,
+            isFinal: isFinal,
+            startTime: startTime,
+            duration: duration,
+            alternativeCount: alternativeCount,
+            locale: locale
+        )
+
+        // Only show final messages in UI
         guard isFinal, !text.isEmpty else { return }
 
         // Deduplicate
