@@ -183,11 +183,6 @@ class PentecostViewModel: ObservableObject {
         remoteMessages.removeAll()
     }
 
-    func openLogsFolder() {
-        let logsPath = FileManager.default.currentDirectoryPath + "/logs"
-        NSWorkspace.shared.open(URL(fileURLWithPath: logsPath))
-    }
-
     func addMessage(_ message: TranscriptionMessage) {
         if message.isLocal {
             // Remove any previous message with same timestamp to avoid duplicates

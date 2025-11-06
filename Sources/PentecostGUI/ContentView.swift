@@ -296,12 +296,6 @@ struct ControlsView: View {
                 .disabled(viewModel.localMessages.isEmpty && viewModel.remoteMessages.isEmpty)
 
                 Spacer()
-
-                Button(action: {
-                    viewModel.openLogsFolder()
-                }) {
-                    Label("Open Logs", systemImage: "folder")
-                }
             }
             .padding()
         }
