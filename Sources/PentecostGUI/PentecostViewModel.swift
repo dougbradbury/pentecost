@@ -43,7 +43,14 @@ class PentecostViewModel: ObservableObject {
 
     func loadAvailableDevices() {
         let deviceManager = AudioDeviceManager()
-        availableDevices = (try? deviceManager.getInputDevices()) ?? []
+        // Get input devices and filter to only those with actual input channels
+        let allInputDevices = (try? deviceManager.getInputDevices()) ?? []
+        availableDevices = allInputDevices.filter { $0.inputChannels > 0 }
+
+        fileLogger?.log("📋 Available input devices:")
+        for device in availableDevices {
+            fileLogger?.log("  - \(device.name): \(device.inputChannels) input channels")
+        }
 
         // Set defaults to first two devices if available
         if availableDevices.count > 0 {
@@ -55,7 +62,9 @@ class PentecostViewModel: ObservableObject {
     }
 
     func start() async {
+        fileLogger?.log("🚀 START function called")
         statusMessage = "🔐 Checking permissions..."
+        fileLogger?.log("🔐 Checking permissions...")
 
         // Request permissions (these need to run without MainActor to avoid crashes)
         let speechAuth = await Self.requestSpeechPermission()
@@ -114,10 +123,12 @@ class PentecostViewModel: ObservableObject {
         statusMessage = "🎙️ Setting up local recognition..."
         fileLogger?.log("🎙️ Setting up LOCAL (microphone) recognition...")
 
+        fileLogger?.log("🎙️ Starting LOCAL audio setup...")
         guard let result = await PentecostViewModel.setupInputRecognition(
             ui: ui,
             speechProcessor: localProcessor,
-            audioService: audioService
+            audioService: audioService,
+            logger: fileLogger
         ) else {
             fileLogger?.log("❌ LOCAL recognition setup failed")
             statusMessage = "❌ Local recognition setup failed"
@@ -181,13 +192,13 @@ class PentecostViewModel: ObservableObject {
 
         // Close transcript files
         transcriptProcessor?.closeAllFiles()
-        
+
         // Clean up recognizers
         inputEnglishRecognizer = nil
         inputFrenchRecognizer = nil
         remoteEnglishRecognizer = nil
         remoteFrenchRecognizer = nil
-        
+
         // Clean up audio engines
         inputAudioEngine = nil
         remoteAudioEngine = nil
@@ -282,7 +293,8 @@ class PentecostViewModel: ObservableObject {
     nonisolated static func setupInputRecognition(
         ui: UserInterface,
         speechProcessor: SpeechProcessor,
-        audioService: AudioEngineService
+        audioService: AudioEngineService,
+        logger: FileLogger?
     ) async -> (englishRecognizer: SingleLanguageSpeechRecognizer, frenchRecognizer: SingleLanguageSpeechRecognizer, audioEngine: AVAudioEngine)? {
         do {
             ui.status("🔧 Creating English recognizer...")
@@ -332,14 +344,40 @@ class PentecostViewModel: ObservableObject {
             }
 
             ui.status("🔌 Installing LOCAL audio tap...")
+            logger?.log("🎤 LOCAL: Device format: \(deviceFormat.sampleRate)Hz, \(deviceFormat.channelCount)ch")
+            logger?.log("🎤 LOCAL: Tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount)ch")
+            ui.status("🎤 LOCAL: Device format: \(deviceFormat.sampleRate)Hz, \(deviceFormat.channelCount)ch")
+            ui.status("🎤 LOCAL: Tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount)ch")
             nonisolated(unsafe) let englishRef = englishRecognizer
             nonisolated(unsafe) let frenchRef = frenchRecognizer
+            nonisolated(unsafe) let fileLogger = logger
             var bufferCount = 0
+            print("🎤 LOCAL: Installing tap with format: \(tapFormat)")
+            fileLogger?.log("🎤 LOCAL: Installing tap...")
             inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { buffer, _ in
                 bufferCount += 1
+                if bufferCount == 1 {
+                    print("🎤 LOCAL: First audio buffer captured!")
+                    fileLogger?.log("🎤 LOCAL: First audio buffer captured!")
+                }
                 if bufferCount % 100 == 0 {
                     print("🎤 LOCAL: Captured \(bufferCount) audio buffers")
                 }
+
+                // Check if buffer has actual audio data
+                let channelData = buffer.floatChannelData?[0]
+                let frameLength = Int(buffer.frameLength)
+                var sum: Float = 0
+                if let data = channelData {
+                    for i in 0..<min(frameLength, 1024) {
+                        sum += abs(data[i])
+                    }
+                }
+                if bufferCount % 100 == 0 {
+                    print("🎤 LOCAL: Audio level check - sum: \(sum)")
+                    fileLogger?.log("🎤 LOCAL: Buffer #\(bufferCount) - Audio level sum: \(sum)")
+                }
+
                 Task {
                     do {
                         try await englishRef.streamAudioToTranscriber(buffer)
@@ -349,11 +387,14 @@ class PentecostViewModel: ObservableObject {
                     }
                 }
             }
+            print("🎤 LOCAL: Tap installed successfully")
+            logger?.log("🎤 LOCAL: Tap installed successfully")
 
             try audioEngine.start()
             print("✅ LOCAL audio engine started successfully")
             print("✅ Input node: \(inputNode)")
             print("✅ Is running: \(audioEngine.isRunning)")
+            print("🎙️ LOCAL: Recognizers created and ready")
             ui.status("🎤 LOCAL audio capture active!")
 
             return (englishRecognizer, frenchRecognizer, audioEngine)
