@@ -337,20 +337,21 @@ class PentecostViewModel: ObservableObject {
 
             let inputNode = audioEngine.inputNode
 
-            // Use the device's output format instead of hardcoded sample rate
+            // Get device format for info display
             let deviceFormat = inputNode.outputFormat(forBus: 0)
             print("🔍 LOCAL device format: \(deviceFormat)")
             print("🔍 Sample rate: \(deviceFormat.sampleRate)Hz, Channels: \(deviceFormat.channelCount)")
 
+            // Use 48kHz for speech recognition (works reliably with all devices including Bluetooth)
             guard let tapFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
-                                               sampleRate: deviceFormat.sampleRate,
+                                               sampleRate: 48000,
                                                channels: 1,
                                                interleaved: false) else {
                 throw AudioError.formatError("Failed to create tap audio format")
             }
             await MainActor.run {
                 if let viewModel = (ui as? GUIUserInterface)?.viewModel {
-                    viewModel.localDeviceFormat = "\(Int(deviceFormat.sampleRate))Hz, \(deviceFormat.channelCount)ch"
+                    viewModel.localDeviceFormat = "\(Int(deviceFormat.sampleRate))Hz → 48kHz, \(deviceFormat.channelCount)ch → 1ch"
                 }
             }
 
