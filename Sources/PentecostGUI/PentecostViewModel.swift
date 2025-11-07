@@ -19,6 +19,8 @@ class PentecostViewModel: ObservableObject {
     @Published var availableDevices: [AudioDevice] = []
     @Published var selectedLocalDeviceID: AudioDeviceID?
     @Published var selectedRemoteDeviceID: AudioDeviceID?
+    @Published var settings = AppSettings()
+    @Published var showSettings = false
 
     private var audioService: AudioEngineService?
     private var inputAudioEngine: AVAudioEngine?
@@ -230,9 +232,18 @@ class PentecostViewModel: ObservableObject {
     }
 
     func translateMessage(_ message: TranscriptionMessage) async {
+        // Determine target language based on settings
+        let targetLang = message.isLocal ? settings.localTranslationLanguage : settings.remoteTranslationLanguage
+        
+        // Skip translation if "No Translation" is selected
+        guard targetLang != .none else { return }
+        
         do {
             let sourceLanguage = Locale.Language(identifier: message.isEnglish ? "en" : "fr")
-            let targetLanguage = Locale.Language(identifier: message.isEnglish ? "fr" : "en")
+            let targetLanguage = Locale.Language(identifier: targetLang.localeIdentifier)
+            
+            // Skip if source and target are the same
+            guard sourceLanguage.languageCode != targetLanguage.languageCode else { return }
 
             let session = TranslationSession(installedSource: sourceLanguage, target: targetLanguage)
             let response = try await session.translate(message.text)

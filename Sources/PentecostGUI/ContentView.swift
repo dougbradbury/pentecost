@@ -7,7 +7,7 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Header
-            HeaderView()
+            HeaderView(settings: viewModel.settings)
 
             Divider()
 
@@ -46,6 +46,14 @@ struct ContentView: View {
 
 @available(macOS 26.0, *)
 struct HeaderView: View {
+    let settings: AppSettings
+    
+    var translationInfo: String {
+        let localLang = settings.localTranslationLanguage
+        let remoteLang = settings.remoteTranslationLanguage
+        return "Local → \(localLang.flag) | Remote → \(remoteLang.flag)"
+    }
+    
     var body: some View {
         VStack(spacing: 4) {
             Text("🕊️ PENTECOST")
@@ -53,7 +61,7 @@ struct HeaderView: View {
             Text("Real-time Multilingual Speech Recognition & Translation")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-            Text("English ⟷ French")
+            Text(translationInfo)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -183,40 +191,6 @@ struct ControlsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Device selection (only shown when not running)
-            if !viewModel.isRunning {
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("🎤 Local Device:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("", selection: $viewModel.selectedLocalDeviceID) {
-                            ForEach(viewModel.availableDevices, id: \.deviceID) { device in
-                                Text(device.name).tag(Optional(device.deviceID))
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(maxWidth: 300)
-                    }
-
-                    HStack {
-                        Text("🔊 Remote Device:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Picker("", selection: $viewModel.selectedRemoteDeviceID) {
-                            ForEach(viewModel.availableDevices, id: \.deviceID) { device in
-                                Text(device.name).tag(Optional(device.deviceID))
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(maxWidth: 300)
-                    }
-                }
-                .padding()
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.3))
-
-                Divider()
-            }
 
             // Device info bar (shown when running)
             if viewModel.isRunning {
@@ -296,9 +270,19 @@ struct ControlsView: View {
                 .disabled(viewModel.localMessages.isEmpty && viewModel.remoteMessages.isEmpty)
 
                 Spacer()
+                
+                Button(action: {
+                    viewModel.showSettings = true
+                }) {
+                    Label("Settings", systemImage: "gear")
+                }
+                .controlSize(.large)
             }
             .padding()
         }
         .background(Color(NSColor.controlBackgroundColor))
+        .sheet(isPresented: $viewModel.showSettings) {
+            SettingsView(viewModel: viewModel)
+        }
     }
 }

@@ -17,3 +17,32 @@ struct TranscriptionMessage: Identifiable {
         self.isLocal = isLocal
     }
 }
+
+enum TranslationLanguage: String, CaseIterable, Identifiable {
+    case english = "English"
+    case french = "Français"
+    case none = "No Translation"
+    
+    var id: String { rawValue }
+    
+    var localeIdentifier: String {
+        switch self {
+        case .english: return "en"
+        case .french: return "fr"
+        case .none: return ""
+        }
+    }
+    
+    var flag: String {
+        switch self {
+        case .english: return "🇺🇸"
+        case .french: return "🇫🇷"
+        case .none: return "🚫"
+        }
+    }
+}
+
+struct AppSettings {
+    var localTranslationLanguage: TranslationLanguage = .french
+    var remoteTranslationLanguage: TranslationLanguage = .english
+}
