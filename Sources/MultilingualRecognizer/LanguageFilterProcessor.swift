@@ -2,16 +2,16 @@ import Foundation
 import NaturalLanguage
 
 @available(macOS 26.0, *)
-final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
+public final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
     private let nextProcessor: SpeechProcessor
     private let confidenceThreshold: Float
 
-    init(nextProcessor: SpeechProcessor, confidenceThreshold: Float = 0.7) {
+    public init(nextProcessor: SpeechProcessor, confidenceThreshold: Float = 0.7) {
         self.nextProcessor = nextProcessor
         self.confidenceThreshold = confidenceThreshold
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    public func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
         // Only filter final results - let partial results through for real-time feedback
         guard isFinal else {
             await nextProcessor.process(

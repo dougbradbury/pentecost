@@ -99,9 +99,16 @@ class PentecostViewModel: ObservableObject {
         // Create UI and processor interfaces
         let ui = GUIUserInterface(viewModel: self)
 
-        // Create processors
-        let localProcessor = GUILocalSpeechProcessor(viewModel: self, transcriptProcessor: transcriptProcessor)
-        let remoteProcessor = GUIRemoteSpeechProcessor(viewModel: self, transcriptProcessor: transcriptProcessor)
+        // Create processor chains (similar to main.swift)
+        // Local chain: Speech -> LanguageFilter -> Translation -> GUI
+        let localGUIProcessor = GUILocalSpeechProcessor(viewModel: self, transcriptProcessor: transcriptProcessor)
+        let localTranslationProcessor = TranslationProcessor(nextProcessor: localGUIProcessor)
+        let localProcessor = LanguageFilterProcessor(nextProcessor: localTranslationProcessor)
+        
+        // Remote chain: Speech -> LanguageFilter -> Translation -> GUI
+        let remoteGUIProcessor = GUIRemoteSpeechProcessor(viewModel: self, transcriptProcessor: transcriptProcessor)
+        let remoteTranslationProcessor = TranslationProcessor(nextProcessor: remoteGUIProcessor)
+        let remoteProcessor = LanguageFilterProcessor(nextProcessor: remoteTranslationProcessor)
 
         // Device selection
         statusMessage = "🎤 Setting up audio devices..."
@@ -224,61 +231,35 @@ class PentecostViewModel: ObservableObject {
             remoteMessages.removeAll { $0.timestamp == message.timestamp && $0.text == message.text }
             remoteMessages.append(message)
         }
-
-        // Translate message in background
-        Task {
-            await translateMessage(message)
-        }
+        // Translation is now handled by TranslationProcessor in the chain
     }
-
-    func translateMessage(_ message: TranscriptionMessage) async {
-        // Determine target language based on settings
-        let targetLang = message.isLocal ? settings.localTranslationLanguage : settings.remoteTranslationLanguage
-        
-        // Skip translation if "No Translation" is selected
-        guard targetLang != .none else { return }
-        
-        do {
-            let sourceLanguage = Locale.Language(identifier: message.isEnglish ? "en" : "fr")
-            let targetLanguage = Locale.Language(identifier: targetLang.localeIdentifier)
-            
-            // Skip if source and target are the same
-            guard sourceLanguage.languageCode != targetLanguage.languageCode else { return }
-
-            let session = TranslationSession(installedSource: sourceLanguage, target: targetLanguage)
-            let response = try await session.translate(message.text)
-
-            // Update message with translation
-            updateMessageWithTranslation(id: message.id, translation: response.targetText)
-        } catch {
-            print("❌ Translation failed: \(error)")
-        }
-    }
-
-    func updateMessageWithTranslation(id: UUID, translation: String) {
-        // Update in local messages
-        if let index = localMessages.firstIndex(where: { $0.id == id }) {
-            let message = localMessages[index]
-            localMessages[index] = TranscriptionMessage(
-                id: message.id,
-                timestamp: message.timestamp,
-                text: message.text,
-                translation: translation,
-                isEnglish: message.isEnglish,
-                isLocal: message.isLocal
-            )
-        }
-        // Update in remote messages
-        else if let index = remoteMessages.firstIndex(where: { $0.id == id }) {
-            let message = remoteMessages[index]
-            remoteMessages[index] = TranscriptionMessage(
-                id: message.id,
-                timestamp: message.timestamp,
-                text: message.text,
-                translation: translation,
-                isEnglish: message.isEnglish,
-                isLocal: message.isLocal
-            )
+    
+    func updateMessageWithTranslation(text: String, translation: String, isLocal: Bool) {
+        // Find the most recent message with matching text and update it
+        if isLocal {
+            if let index = localMessages.lastIndex(where: { $0.text == text && $0.translation == nil }) {
+                let message = localMessages[index]
+                localMessages[index] = TranscriptionMessage(
+                    id: message.id,
+                    timestamp: message.timestamp,
+                    text: message.text,
+                    translation: translation,
+                    isEnglish: message.isEnglish,
+                    isLocal: message.isLocal
+                )
+            }
+        } else {
+            if let index = remoteMessages.lastIndex(where: { $0.text == text && $0.translation == nil }) {
+                let message = remoteMessages[index]
+                remoteMessages[index] = TranscriptionMessage(
+                    id: message.id,
+                    timestamp: message.timestamp,
+                    text: message.text,
+                    translation: translation,
+                    isEnglish: message.isEnglish,
+                    isLocal: message.isLocal
+                )
+            }
         }
     }
 
@@ -502,6 +483,7 @@ final class GUILocalSpeechProcessor: @unchecked Sendable, SpeechProcessor {
     weak var viewModel: PentecostViewModel?
     private let transcriptProcessor: TranscriptFileProcessor?
     private var lastProcessedText: [String: Double] = [:]
+    private var lastOriginalText: String = ""
 
     init(viewModel: PentecostViewModel, transcriptProcessor: TranscriptFileProcessor? = nil) {
         self.viewModel = viewModel
@@ -523,6 +505,16 @@ final class GUILocalSpeechProcessor: @unchecked Sendable, SpeechProcessor {
 
         // Only show final messages in UI
         guard isFinal, !text.isEmpty else { return }
+        
+        // Check if this is a translation (starts with "🔄 ")
+        if text.hasPrefix("🔄 ") {
+            let translationText = String(text.dropFirst(2)) // Remove "🔄 "
+            print("🌍 LOCAL: Translation received: \(translationText)")
+            Task { @MainActor in
+                viewModel?.updateMessageWithTranslation(text: lastOriginalText, translation: translationText, isLocal: true)
+            }
+            return
+        }
 
         // Deduplicate using text and timestamp
         let key = "\(text)-\(startTime)"
@@ -531,6 +523,7 @@ final class GUILocalSpeechProcessor: @unchecked Sendable, SpeechProcessor {
             return
         }
         lastProcessedText[key] = Date().timeIntervalSince1970
+        lastOriginalText = text
 
         let isEnglish = locale.hasPrefix("en")
 
@@ -552,6 +545,7 @@ final class GUIRemoteSpeechProcessor: @unchecked Sendable, SpeechProcessor {
     weak var viewModel: PentecostViewModel?
     private let transcriptProcessor: TranscriptFileProcessor?
     private var lastProcessedText: [String: Double] = [:]
+    private var lastOriginalText: String = ""
 
     init(viewModel: PentecostViewModel, transcriptProcessor: TranscriptFileProcessor? = nil) {
         self.viewModel = viewModel
@@ -573,6 +567,16 @@ final class GUIRemoteSpeechProcessor: @unchecked Sendable, SpeechProcessor {
 
         // Only show final messages in UI
         guard isFinal, !text.isEmpty else { return }
+        
+        // Check if this is a translation (starts with "🔄 ")
+        if text.hasPrefix("🔄 ") {
+            let translationText = String(text.dropFirst(2)) // Remove "🔄 "
+            print("🌍 REMOTE: Translation received: \(translationText)")
+            Task { @MainActor in
+                viewModel?.updateMessageWithTranslation(text: lastOriginalText, translation: translationText, isLocal: false)
+            }
+            return
+        }
 
         // Deduplicate
         let key = "\(text)-\(startTime)"
@@ -581,6 +585,7 @@ final class GUIRemoteSpeechProcessor: @unchecked Sendable, SpeechProcessor {
             return
         }
         lastProcessedText[key] = Date().timeIntervalSince1970
+        lastOriginalText = text
 
         let isEnglish = locale.hasPrefix("en")
 

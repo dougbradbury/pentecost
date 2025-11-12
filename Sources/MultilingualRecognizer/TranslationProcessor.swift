@@ -2,14 +2,14 @@ import Foundation
 import Translation
 
 @available(macOS 26.0, *)
-final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
+public final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
     private let nextProcessor: SpeechProcessor
 
-    init(nextProcessor: SpeechProcessor) {
+    public init(nextProcessor: SpeechProcessor) {
         self.nextProcessor = nextProcessor
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    public func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
         // Always pass through the original result
         await nextProcessor.process(
             text: text,
