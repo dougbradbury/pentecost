@@ -3,17 +3,17 @@ import CoreAudio
 import AVFoundation
 
 /// Represents an audio device with its properties
-struct AudioDevice {
-    let deviceID: AudioDeviceID
-    let name: String
-    let uid: String
-    let manufacturer: String
-    let hasInput: Bool
-    let hasOutput: Bool
-    let inputChannels: Int
-    let outputChannels: Int
-    let isDefaultInput: Bool
-    let isDefaultOutput: Bool
+public struct AudioDevice {
+    public let deviceID: AudioDeviceID
+    public let name: String
+    public let uid: String
+    public let manufacturer: String
+    public let hasInput: Bool
+    public let hasOutput: Bool
+    public let inputChannels: Int
+    public let outputChannels: Int
+    public let isDefaultInput: Bool
+    public let isDefaultOutput: Bool
 
     var description: String {
         let type = hasInput && hasOutput ? "I/O" : hasInput ? "Input" : "Output"
@@ -25,10 +25,12 @@ struct AudioDevice {
 
 /// Manages audio device enumeration and selection for macOS
 @available(macOS 26.0, *)
-final class AudioDeviceManager {
+public final class AudioDeviceManager {
+
+    public init() {}
 
     /// Enumerate all available audio devices
-    func getAllAudioDevices() throws -> [AudioDevice] {
+    public func getAllAudioDevices() throws -> [AudioDevice] {
         var devices: [AudioDevice] = []
 
         // Get all device IDs
@@ -52,12 +54,12 @@ final class AudioDeviceManager {
     }
 
     /// Get only input devices (devices with input channels)
-    func getInputDevices() throws -> [AudioDevice] {
+    public func getInputDevices() throws -> [AudioDevice] {
         return try getAllAudioDevices().filter { $0.hasInput }
     }
 
     /// Get only output devices (devices with output channels)
-    func getOutputDevices() throws -> [AudioDevice] {
+    public func getOutputDevices() throws -> [AudioDevice] {
         return try getAllAudioDevices().filter { $0.hasOutput }
     }
 

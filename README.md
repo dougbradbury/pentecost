@@ -1,106 +1,152 @@
-# Pentecost
+# 🕊️ Pentecost
 
-*Real-time multilingual speech recognition and translation - where everyone understands everyone else*
+> "Where Everyone Understands Everyone Else"
 
-Pentecost is a real-time speech recognition and translation application that captures dual audio streams (microphone + system audio), transcribes speech in English and French simultaneously, and provides live translations. Named after the biblical Pentecost where people of different languages could miraculously understand each other.
+Real-time multilingual speech recognition for macOS. Simultaneously transcribe audio from your microphone and system audio (e.g., video calls) with automatic language detection for English and French.
 
-## Features
+## ✨ Features
 
-- **🎤 Dual Audio Capture**: Simultaneously records from microphone (local speech) and system audio (remote participants)
-- **🌍 Multilingual Recognition**: Real-time speech recognition for English and French
-- **⚡ Live Translation**: Instant translation between English ↔ French
-- **📊 Two-Column Display**: Side-by-side English and French transcription with timestamps
-- **📝 Meeting Transcripts**: Automatic transcript saving with weekly organization
-- **🎛️ Dynamic Terminal**: Responsive interface that adapts to any terminal size
-- **🔊 Device Selection**: Interactive audio device selection for optimal setup
+- **Dual Audio Capture**: Monitor local (microphone) and remote (system audio) simultaneously
+- **Real-time Transcription**: Powered by Apple's Speech framework
+- **Bilingual Support**: Automatic detection for English ⟷ French
+- **Beautiful GUI**: Clean two-column SwiftUI interface
+- **Automatic Logging**: All transcriptions saved to timestamped log files
+- **Translation Ready**: Architecture supports real-time translation
 
-## Requirements
+## 🚀 Quick Start
 
-- **macOS 26.0+** (requires Apple's new SpeechAnalyzer API)
-- **Microphone permissions** for speech input
-- **Audio input device** (USB headset, aggregate device, or BlackHole for system audio)
+### Requirements
 
-## Installation
+- macOS 15.0 or later
+- Xcode Command Line Tools
+- Swift 6.1+
+
+### Build & Run
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd RealTimeTranslatorApp
-
-# Build the application
-swift build
-
-# Run Pentecost
-./.build/debug/MultilingualRecognizer
+./build.sh
 ```
 
-## Usage
+The app will automatically open after building. On first launch, grant **Speech Recognition** and **Microphone** permissions when prompted.
 
-1. **Launch the application** - You'll be prompted to select audio input devices
-2. **Choose LOCAL device** - Your microphone for capturing your speech
-3. **Choose REMOTE device** - System audio capture (use BlackHole or aggregate device for remote participants)
-4. **Start speaking** - The app will transcribe and translate in real-time
-5. **View results** - English and French appear in side-by-side columns with live translation
+## 📖 Usage
 
-## Audio Setup
+### Basic Operation
 
-For complete meeting capture, install [BlackHole](https://github.com/ExistentialAudio/BlackHole) to capture system audio:
+1. Launch `Pentecost.app` (double-click or `open Pentecost.app`)
+2. Click **Start** to begin transcription
+3. Speak or play audio
+4. View real-time transcriptions:
+   - **🎤 LOCAL (You)**: Your microphone
+   - **🔊 REMOTE (Them)**: System audio
+5. Click **Stop** to end the session
+6. Click **Open Logs** to view saved transcriptions
 
+### Capturing System Audio (Video Calls)
+
+To capture audio from Zoom, Google Meet, etc., install a virtual audio device:
+
+**BlackHole (Free, Recommended):**
 ```bash
-# Install BlackHole via Homebrew
 brew install blackhole-2ch
 ```
 
-Then configure your audio settings to route meeting audio through BlackHole while using your microphone for local speech.
+Then configure:
+1. Open **Audio MIDI Setup** (/Applications/Utilities/)
+2. Create a **Multi-Output Device** with BlackHole + your speakers
+3. Set as system output in System Settings → Sound
+4. In Pentecost, select BlackHole as the remote input device
 
-## File Organization
+## 🏗️ Project Structure
 
-Transcripts are automatically saved to:
 ```
-~/Meeting_Recordings/summaries/Week_YYYY-MM-DD/transcripts/
-├── transcript_2024-01-15_14-30-22_en-US.txt
-└── transcript_2024-01-15_14-30-22_fr-FR.txt
+Pentecost/
+├── Pentecost.app              # Main GUI application
+├── build.sh                   # Build script
+├── Pentecost.entitlements     # Security permissions
+├── logs/                      # Auto-generated transcription logs
+└── Sources/
+    ├── PentecostGUI/          # SwiftUI application
+    └── MultilingualRecognizer/ # Core library (PentecostCore)
 ```
 
-Set custom location with: `export MEETING_SUMMARY_DIR=/path/to/your/summaries`
+## 🔧 Development
 
-## Architecture
-
-- **SingleLanguageSpeechRecognizer**: Handles individual language transcription using Apple's SpeechAnalyzer
-- **BroadcastProcessor**: Enables parallel processing for terminal display + file saving
-- **MessageBuffer**: Manages message deduplication and overlap handling
-- **TerminalRenderer**: Dynamic terminal display with automatic sizing
-- **TranscriptFileProcessor**: Saves final transcripts with weekly organization
-
-## Development
+### Building
 
 ```bash
-# Run tests
-swift test
+# Build and create app bundle
+./build.sh
+
+# Build without bundling
+swift build --product PentecostGUI
 
 # Clean build
-rm -rf .build && swift build
-
-# Development with verbose output
-./.build/debug/MultilingualRecognizer --verbose
+swift package clean
 ```
 
-## Technical Notes
+### Architecture
 
-This application leverages Apple's cutting-edge SpeechAnalyzer API introduced in macOS 26.0, which provides:
-- Superior multilingual speech recognition
-- Real-time processing capabilities
-- Advanced audio format compatibility
-- Parallel transcriber support
+- **PentecostCore**: Audio processing, speech recognition, device management
+- **PentecostGUI**: SwiftUI interface and user interaction
+- **MVVM Pattern**: ViewModel coordinates recognition engines with UI
+- **Protocol-based**: Dependency injection for testability
 
-## Contributing
+## 🐛 Troubleshooting
 
-Contributions welcome! This project demonstrates practical implementation of Apple's latest speech recognition technologies for real-world multilingual communication scenarios.
+### App Won't Launch
+- Verify macOS 15.0+
+- Rebuild: `./build.sh`
+- Check Console.app for errors
 
-## License
+### No Permission Dialogs
+```bash
+# Reset permissions
+tccutil reset Microphone
+tccutil reset SpeechRecognition
 
-MIT License - See LICENSE file for details
+# Rebuild
+rm -rf Pentecost.app && ./build.sh
+```
+
+### Audio Not Captured
+- Check System Settings → Sound
+- For system audio: ensure virtual device is configured
+- Click "Start" after granting permissions
+
+## 📝 Logs
+
+Logs are saved to: `logs/pentecost_YYYY-MM-DD_HH-MM-SS.log`
+
+Click **"Open Logs"** in the app to access them.
+
+## 🔐 Privacy
+
+- All processing is **local** on your Mac
+- No data sent to external servers
+- Requires microphone and speech recognition permissions
+
+## 🛠️ Tech Stack
+
+- Swift 6.1 + SwiftUI
+- AVFoundation (audio capture)
+- Speech framework (transcription)
+- CoreAudio (device management)
+- Swift Concurrency (async/await)
+
+## 🗺️ Roadmap
+
+- [ ] Real-time translation English ⟷ French
+- [ ] Additional languages
+- [ ] Export to various formats
+- [ ] Keyword search and highlighting
+- [ ] Custom vocabulary
+- [ ] Audio enhancement
+
+## 📄 License
+
+© 2025 MyAgro
 
 ---
 
-*"And they were all filled with the Holy Spirit and began to speak in other tongues as the Spirit enabled them... each one heard their own language being spoken."* - Acts 2:4,6
+*"And they were all filled with the Holy Spirit and began to speak in other tongues... each one heard their own language being spoken."* - Acts 2:4,6

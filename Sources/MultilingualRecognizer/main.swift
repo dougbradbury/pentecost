@@ -3,13 +3,6 @@ import Foundation
 @preconcurrency import AVFoundation
 import CoreAudio
 
-// MARK: - Error Types
-
-enum AudioError: Error {
-    case formatError(String)
-    case deviceError(String)
-}
-
 // MARK: - App Entry Point
 
 @available(macOS 26.0, *)
@@ -52,6 +45,7 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         ui.status("🎤 LOCAL tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for local audio - stream to both recognizers
+        ui.status("🔌 Installing LOCAL audio tap...")
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
             guard let english = englishRecognizer, let french = frenchRecognizer else { return }
             Task { @Sendable [english, french] in
@@ -118,6 +112,7 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         ui.status("🔊 REMOTE tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for remote audio - stream to both recognizers
+        ui.status("🔌 Installing REMOTE audio tap...")
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
             guard let english = englishRecognizer, let french = frenchRecognizer else { return }
             Task { @Sendable [english, french] in
@@ -302,6 +297,13 @@ func performCleanShutdown(
 
 @available(macOS 26.0, *)
 func main() async {
+    // Initialize file logger
+    do {
+        globalLogger = try FileLogger()
+    } catch {
+        print("⚠️ Failed to initialize file logger: \(error)")
+    }
+
     let ui: UserInterface = TerminalUI()
 
     // Display beautiful Pentecost ASCII art and branding
@@ -330,34 +332,43 @@ func main() async {
 
     ui.status("📱 Platform: macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
     ui.status("🕊️ Pentecost v1.0 - The Miracle of Understanding")
+    globalLogger?.log("🚀 App started successfully")
     print("")
 
     // Set up signal handling for graceful shutdown
     setupSignalHandling()
+    globalLogger?.log("✅ Signal handling configured")
 
     // Request permissions upfront
+    globalLogger?.log("🔐 Requesting speech recognition permission...")
     let speechAuth = await withCheckedContinuation { continuation in
         SFSpeechRecognizer.requestAuthorization { status in
             continuation.resume(returning: status)
         }
     }
 
+    globalLogger?.log("🔐 Speech auth status: \(speechAuth.rawValue)")
     guard speechAuth == .authorized else {
+        globalLogger?.log("❌ Speech recognition not authorized")
         ui.status("❌ Speech recognition not authorized")
         return
     }
 
+    globalLogger?.log("🔐 Requesting microphone permission...")
     let micPermission = await withCheckedContinuation { continuation in
         AVAudioApplication.requestRecordPermission { granted in
             continuation.resume(returning: granted)
         }
     }
 
+    globalLogger?.log("🔐 Microphone permission: \(micPermission)")
     guard micPermission else {
+        globalLogger?.log("❌ Microphone permission denied")
         ui.status("❌ Microphone permission denied")
         return
     }
 
+    globalLogger?.log("✅ All permissions granted")
     ui.status("✅ Permissions granted")
 
     // Add startup delay to ensure clean Speech framework state
@@ -394,17 +405,23 @@ func main() async {
     )
 
     // Run device selection
+    globalLogger?.log("🎤 Starting audio device selection...")
     do {
         try await audioSetupCoordinator.runDeviceSelection()
+        globalLogger?.log("✅ Audio devices selected")
     } catch {
+        globalLogger?.log("❌ Audio setup failed: \(error)")
         ui.status("❌ Audio setup failed: \(error)")
         return
     }
 
     // Set up input recognition (local microphone)
+    globalLogger?.log("🎙️ Setting up LOCAL (microphone) recognition...")
     guard let (inputEnglishRecognizer, inputFrenchRecognizer, inputAudioEngine) = await setupInputRecognition(ui: ui, speechProcessor: localLanguageFilter, audioService: audioService) else {
+        globalLogger?.log("❌ LOCAL recognition setup failed")
         return
     }
+    globalLogger?.log("✅ LOCAL recognition active")
 
     // Add delay between local and remote setup to avoid overwhelming Speech framework
     ui.status("⏳ Pausing before remote audio setup...")
@@ -415,9 +432,12 @@ func main() async {
     }
 
     // Set up remote recognition (system/BlackHole audio)
+    globalLogger?.log("🔊 Setting up REMOTE (system audio) recognition...")
     guard let (remoteEnglishRecognizer, remoteFrenchRecognizer, remoteAudioEngine) = await setupRemoteRecognition(ui: ui, speechProcessor: remoteLanguageFilter, audioService: audioService) else {
+        globalLogger?.log("❌ REMOTE recognition setup failed")
         return
     }
+    globalLogger?.log("✅ REMOTE recognition active")
 
     // Enable raw terminal mode for keyboard input
     let originalTermios = enableRawMode()

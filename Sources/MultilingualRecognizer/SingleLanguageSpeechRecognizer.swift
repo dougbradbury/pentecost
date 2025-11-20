@@ -3,7 +3,7 @@ import Foundation
 @preconcurrency import AVFoundation
 
 @available(macOS 26.0, *)
-final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
+public final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
     private var inputSequence: AsyncStream<AnalyzerInput>?
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
 
@@ -19,14 +19,14 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
 
     var analyzerFormat: AVAudioFormat?
 
-    init(ui: UserInterface, speechProcessor: SpeechProcessor, locale: String) {
+    public init(ui: UserInterface, speechProcessor: SpeechProcessor, locale: String) {
         self.ui = ui
         self.speechProcessor = speechProcessor
         self.localeIdentifier = locale
         self.locale = Locale(identifier: locale)
     }
 
-    func setUpTranscriber() async throws {
+    public func setUpTranscriber() async throws {
         ui.status("🔧 Setting up \(localeIdentifier) transcriber...")
 
         // Add startup delay to avoid Speech framework resource conflicts on rapid restart
@@ -97,10 +97,14 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         let locale = self.localeIdentifier
         recognitionTask = Task { @Sendable in
             do {
+                globalLogger?.log("👂 [\(locale)] Recognition task started, waiting for results...")
+                ui.status("👂 [\(locale)] Recognition task started, waiting for results...")
                 for try await case let result in transcriber.results {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
+                    globalLogger?.log("📝 [\(locale)] Got result: '\(text)' (final: \(result.isFinal))")
+                    ui.status("📝 [\(locale)] Got result: '\(text)' (final: \(result.isFinal))")
                     await processor.process(
                         text: text,
                         isFinal: result.isFinal,
@@ -110,7 +114,10 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
                         locale: locale
                     )
                 }
+                globalLogger?.log("⚠️ [\(locale)] Recognition task ended - no more results")
+                ui.status("⚠️ [\(locale)] Recognition task ended - no more results")
             } catch {
+                globalLogger?.log("❌ \(locale) recognition failed: \(error)")
                 ui.status("❌ \(locale) recognition failed: \(error)")
             }
         }
@@ -120,7 +127,7 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         ui.status("🎯 \(localeIdentifier) SpeechAnalyzer started successfully!")
     }
 
-    func streamAudioToTranscriber(_ buffer: AVAudioPCMBuffer) async throws {
+    public func streamAudioToTranscriber(_ buffer: AVAudioPCMBuffer) async throws {
         guard let inputBuilder, let analyzerFormat else {
             throw NSError(domain: "TranscriptionError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Invalid audio setup for \(localeIdentifier)"])
         }
@@ -129,11 +136,11 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         let converted = try self.converter.convertBuffer(buffer, to: analyzerFormat)
         let input = AnalyzerInput(buffer: converted)
 
-        // Send to analyzer
+        // Send to analyzer (don't update UI from audio callback)
         inputBuilder.yield(input)
     }
 
-    func finishTranscribing() async throws {
+    public func finishTranscribing() async throws {
         ui.status("🛑 Finishing \(localeIdentifier) transcription...")
 
         // Stop input stream first

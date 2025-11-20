@@ -3,19 +3,19 @@ import Foundation
 /// Coordinator for audio device setup - UI-independent
 /// Orchestrates device selection using injected DeviceSelector
 @available(macOS 26.0, *)
-struct AudioSetupCoordinator {
+public struct AudioSetupCoordinator {
     private let audioService: AudioEngineService
     private let deviceSelector: DeviceSelector
     private let ui: UserInterface
 
-    init(audioService: AudioEngineService, deviceSelector: DeviceSelector, ui: UserInterface) {
+    public init(audioService: AudioEngineService, deviceSelector: DeviceSelector, ui: UserInterface) {
         self.audioService = audioService
         self.deviceSelector = deviceSelector
         self.ui = ui
     }
 
     /// Run the complete dual input device selection process
-    func runDeviceSelection() async throws {
+    public func runDeviceSelection() async throws {
         ui.status("🎤 Dual Input Device Selection")
         ui.status(String(repeating: "=", count: 50))
 
