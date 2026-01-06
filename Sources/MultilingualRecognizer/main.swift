@@ -24,15 +24,14 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         ui.status("🔧 Setting up English transcriber...")
         try await englishRecognizer.setUpTranscriber()
 
-        // Longer delay between language setups to ensure Speech framework stability
-        ui.status("⏳ Waiting before French setup...")
-        try await Task.sleep(for: .milliseconds(1000))
-
         ui.status("🔧 Creating French recognizer...")
         let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
 
         ui.status("🔧 Setting up French transcriber...")
         try await frenchRecognizer.setUpTranscriber()
+
+        // Brief delay to allow Speech framework to fully stabilize before audio engine creation
+        try await Task.sleep(for: .milliseconds(100))
 
         // Set up audio engine with first input device (local microphone)
         let audioEngine = try audioService.createFirstAudioEngine()
@@ -90,15 +89,14 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         ui.status("🔧 Setting up English transcriber for REMOTE...")
         try await englishRecognizer.setUpTranscriber()
 
-        // Longer delay between language setups to ensure Speech framework stability
-        ui.status("⏳ Waiting before French setup for REMOTE...")
-        try await Task.sleep(for: .milliseconds(1000))
-
         ui.status("🔧 Creating French recognizer for REMOTE...")
         let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
 
         ui.status("🔧 Setting up French transcriber for REMOTE...")
         try await frenchRecognizer.setUpTranscriber()
+
+        // Brief delay to allow Speech framework to fully stabilize before audio engine creation
+        try await Task.sleep(for: .milliseconds(100))
 
         // Set up audio engine with second input device (remote/system audio)
         let audioEngine = try audioService.createSecondAudioEngine()
@@ -360,15 +358,6 @@ func main() async {
 
     ui.status("✅ Permissions granted")
 
-    // Add startup delay to ensure clean Speech framework state
-    ui.status("⏳ Initializing Speech framework...")
-    do {
-        try await Task.sleep(for: .milliseconds(250))
-    } catch {
-        // Sleep cancellation is not a critical error
-        ui.status("⚠️ Initialization delay interrupted")
-    }
-
     // Create separate processing chains for each audio stream
 
     // Shared processors
@@ -406,12 +395,11 @@ func main() async {
         return
     }
 
-    // Add delay between local and remote setup to avoid overwhelming Speech framework
-    ui.status("⏳ Pausing before remote audio setup...")
+    // Brief delay between creating separate audio engines to avoid audio system conflicts
     do {
-        try await Task.sleep(for: .milliseconds(1500))
+        try await Task.sleep(for: .milliseconds(200))
     } catch {
-        ui.status("⚠️ Remote setup delay interrupted")
+        // Sleep interruption is not critical
     }
 
     // Set up remote recognition (system/BlackHole audio)

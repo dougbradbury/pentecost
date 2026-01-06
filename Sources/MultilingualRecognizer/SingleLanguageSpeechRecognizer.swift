@@ -29,9 +29,6 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
     func setUpTranscriber() async throws {
         ui.status("🔧 Setting up \(localeIdentifier) transcriber...")
 
-        // Add startup delay to avoid Speech framework resource conflicts on rapid restart
-        try await Task.sleep(for: .milliseconds(200))
-
         // Create transcriber for the specified language with retry mechanism
         var retryCount = 0
         let maxRetries = 3
@@ -60,9 +57,6 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         }
 
         ui.status("✅ \(localeIdentifier) transcriber created")
-
-        // Add delay before SpeechAnalyzer creation to prevent resource conflicts
-        try await Task.sleep(for: .milliseconds(200))
 
         // Create SpeechAnalyzer with single transcriber - retry if needed
         retryCount = 0
