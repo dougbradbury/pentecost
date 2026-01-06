@@ -1,12 +1,12 @@
 import Foundation
 
 @available(macOS 26.0, *)
-final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
+actor TranscriptFileProcessor: SpeechProcessor {
     private let baseDirectory: URL
     private var sessionTimestamp: String
     private var openFiles: [String: FileHandle] = [:]
     private let fileManager = FileManager.default
-    private let dateFormatter: DateFormatter
+    private let filenameDateFormatter: DateFormatter
 
     init() {
         // Read MEETING_SUMMARY_DIR environment variable
@@ -18,12 +18,13 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
 
         self.baseDirectory = URL(fileURLWithPath: summaryDirPath)
 
-        // Set up date formatter for timestamps
-        self.dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        // Set up date formatter for filenames
+        // Note: This is only used during init and startNewTranscriptFile (not concurrent)
+        self.filenameDateFormatter = DateFormatter()
+        filenameDateFormatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
 
         // Capture initial session start time for filename timestamp
-        self.sessionTimestamp = dateFormatter.string(from: Date())
+        self.sessionTimestamp = filenameDateFormatter.string(from: Date())
     }
 
     deinit {
@@ -41,9 +42,21 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
         guard !text.isEmpty else { return }
 
         do {
-            let fileHandle = try await getFileHandle(for: locale)
-            let timestamp = formatTimestamp(startTime)
-            let endTime = formatTimestamp(startTime + duration)
+            let fileHandle = try getFileHandle(for: locale)
+
+            // Use actual system time instead of relative recording time
+            let now = Date()
+
+            // DateFormatter is not thread-safe, so create fresh instances per call
+            // This avoids race conditions when multiple recognizers call process() simultaneously
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+            let timestamp = formatter.string(from: now)
+
+            // Calculate end time by adding duration
+            let endDate = now.addingTimeInterval(duration)
+            let endTime = formatter.string(from: endDate)
+
             let entry = "\(timestamp) - \(endTime): \(text)\n"
 
             if let data = entry.data(using: .utf8) {
@@ -54,7 +67,7 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
         }
     }
 
-    private func getFileHandle(for locale: String) async throws -> FileHandle {
+    private func getFileHandle(for locale: String) throws -> FileHandle {
         if let existing = openFiles[locale] {
             return existing
         }
@@ -71,7 +84,7 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
 
         // Create file if it doesn't exist
         if !fileManager.fileExists(atPath: fileURL.path) {
-            let header = "# Transcript for \(locale)\n# Format: [start] - [end]: [text]\n\n"
+            let header = "# Transcript for \(locale)\n# Format: [YYYY-MM-DD HH:mm:ss.SSS] - [YYYY-MM-DD HH:mm:ss.SSS]: [text]\n\n"
             try header.write(to: fileURL, atomically: true, encoding: .utf8)
         }
 
@@ -102,24 +115,18 @@ final class TranscriptFileProcessor: @unchecked Sendable, SpeechProcessor {
         return baseDirectory.appendingPathComponent(weekName)
     }
 
-    private func formatTimestamp(_ time: Double) -> String {
-        let minutes = Int(time) / 60
-        let seconds = time.truncatingRemainder(dividingBy: 60)
-        return String(format: "%02d:%05.2f", minutes, seconds)
-    }
-
     // MARK: - Public API
 
     /// Start a new transcript file with a fresh timestamp
     /// Closes existing file handles and creates new files for subsequent writes
     /// - Returns: The new session timestamp used for the filename
     @discardableResult
-    func startNewTranscriptFile() async -> String {
+    func startNewTranscriptFile() -> String {
         // Close all existing file handles
         closeAllFiles()
 
         // Generate new session timestamp
-        let newTimestamp = dateFormatter.string(from: Date())
+        let newTimestamp = filenameDateFormatter.string(from: Date())
         sessionTimestamp = newTimestamp
 
         return newTimestamp

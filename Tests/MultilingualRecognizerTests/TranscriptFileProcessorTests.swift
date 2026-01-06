@@ -59,7 +59,7 @@ final class TranscriptFileProcessorTests: XCTestCase {
     // MARK: - Basic Functionality Tests
 
     func testGetCurrentSessionTimestamp() async {
-        let timestamp = processor.getCurrentSessionTimestamp()
+        let timestamp = await processor.getCurrentSessionTimestamp()
 
         // Verify timestamp format: yyyy-MM-dd_HH-mm-ss
         XCTAssertTrue(timestamp.contains("-"))
@@ -68,7 +68,7 @@ final class TranscriptFileProcessorTests: XCTestCase {
     }
 
     func testStartNewTranscriptFile() async {
-        let originalTimestamp = processor.getCurrentSessionTimestamp()
+        let originalTimestamp = await processor.getCurrentSessionTimestamp()
 
         // Wait a tiny bit to ensure timestamp will be different
         try? await Task.sleep(for: .seconds(1))
@@ -79,7 +79,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
         XCTAssertNotEqual(originalTimestamp, newTimestamp)
 
         // Verify current timestamp was updated
-        XCTAssertEqual(processor.getCurrentSessionTimestamp(), newTimestamp)
+        let currentTimestamp = await processor.getCurrentSessionTimestamp()
+        XCTAssertEqual(currentTimestamp, newTimestamp)
     }
 
     func testStartNewTranscriptFileCreatesNewFiles() async {
@@ -93,7 +94,7 @@ final class TranscriptFileProcessorTests: XCTestCase {
             locale: "en-US"
         )
 
-        let firstTimestamp = processor.getCurrentSessionTimestamp()
+        let firstTimestamp = await processor.getCurrentSessionTimestamp()
 
         // Wait to ensure different timestamp
         try? await Task.sleep(for: .seconds(1))
@@ -143,7 +144,7 @@ final class TranscriptFileProcessorTests: XCTestCase {
         )
 
         // Close all files
-        processor.closeAllFiles()
+        await processor.closeAllFiles()
 
         // Files should still exist on disk (in weekly directory structure)
         let transcriptFiles = findTranscriptFiles(in: tempDirectory)
@@ -182,7 +183,7 @@ final class TranscriptFileProcessorTests: XCTestCase {
             locale: "fr-FR"
         )
 
-        _ = processor.getCurrentSessionTimestamp()
+        _ = await processor.getCurrentSessionTimestamp()
 
         // Wait for different timestamp
         try? await Task.sleep(for: .seconds(1))
