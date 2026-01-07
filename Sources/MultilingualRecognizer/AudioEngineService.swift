@@ -40,22 +40,22 @@ final class AudioEngineService {
     }
 
     /// Create audio engine configured with the first input device (local)
-    func createFirstAudioEngine() throws -> AVAudioEngine {
+    func createFirstAudioEngine() async throws -> AVAudioEngine {
         let engine = AVAudioEngine()
 
         if let device = firstInputDevice {
-            try deviceManager.setInputDevice(device, for: engine)
+            try await deviceManager.setInputDevice(device, for: engine)
         }
 
         return engine
     }
 
     /// Create audio engine configured with the second input device (remote)
-    func createSecondAudioEngine() throws -> AVAudioEngine {
+    func createSecondAudioEngine() async throws -> AVAudioEngine {
         let engine = AVAudioEngine()
 
         if let device = secondInputDevice {
-            try deviceManager.setInputDevice(device, for: engine)
+            try await deviceManager.setInputDevice(device, for: engine)
         }
 
         return engine

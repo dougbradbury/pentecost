@@ -4,7 +4,7 @@ import Foundation
 actor MessageBuffer {
     private var messages: [SpeechMessage] = []
 
-    func updateMessage(text: String, isFinal: Bool, startTime: Double, duration: Double, locale: String) {
+    func updateMessage(text: String, isFinal: Bool, startTime: Double, duration: Double, locale: String, source: String) {
         // Strategy 1: Look for existing message with similar startTime (0.1s tolerance)
         if let index = messages.firstIndex(where: { abs($0.startTime - startTime) < 0.1 }) {
             // Update existing message found by time
@@ -50,7 +50,8 @@ actor MessageBuffer {
             text: text,
             isFinal: isFinal,
             duration: duration,
-            locale: locale
+            locale: locale,
+            source: source
         )
         messages.append(message)
         // Sort by startTime to maintain chronological order

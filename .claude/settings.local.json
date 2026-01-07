@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "Bash(swift build:*)",
+      "Bash(./.build/debug/MultilingualRecognizer:*)"
     ],
     "deny": [],
     "ask": []

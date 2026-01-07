@@ -6,6 +6,7 @@ struct SpeechMessage {
     var isFinal: Bool
     var duration: Double
     let locale: String
+    let source: String
 
     var endTime: Double {
         return startTime + duration
@@ -56,12 +57,12 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
         self.terminalRenderer = TerminalRenderer()
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String, source: String) async {
         switch locale {
         case "en-US", "en":
-            await englishBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
+            await englishBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale, source: source)
         case "fr-CA", "fr":
-            await frenchBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale)
+            await frenchBuffer.updateMessage(text: text, isFinal: isFinal, startTime: startTime, duration: duration, locale: locale, source: source)
         default:
             break
         }

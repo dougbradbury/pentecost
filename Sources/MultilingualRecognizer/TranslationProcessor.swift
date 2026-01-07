@@ -9,7 +9,7 @@ final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
         self.nextProcessor = nextProcessor
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String, source: String) async {
         // Always pass through the original result
         await nextProcessor.process(
             text: text,
@@ -17,7 +17,8 @@ final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
             startTime: startTime,
             duration: duration,
             alternativeCount: alternativeCount,
-            locale: locale
+            locale: locale,
+            source: source
         )
 
         // Only translate final results
@@ -54,7 +55,8 @@ final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
                 startTime: startTime,
                 duration: duration,
                 alternativeCount: 1, // Translation result has no alternatives
-                locale: targetLocale
+                locale: targetLocale,
+                source: source
             )
 
         } catch {

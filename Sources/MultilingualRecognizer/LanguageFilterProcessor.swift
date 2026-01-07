@@ -11,7 +11,7 @@ final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
         self.confidenceThreshold = confidenceThreshold
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String, source: String) async {
         // Only filter final results - let partial results through for real-time feedback
         guard isFinal else {
             await nextProcessor.process(
@@ -20,7 +20,8 @@ final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
                 startTime: startTime,
                 duration: duration,
                 alternativeCount: alternativeCount,
-                locale: locale
+                locale: locale,
+                source: source
             )
             return
         }
@@ -33,7 +34,8 @@ final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
                 startTime: startTime,
                 duration: duration,
                 alternativeCount: alternativeCount,
-                locale: locale
+                locale: locale,
+                source: source
             )
             return
         }
@@ -50,7 +52,8 @@ final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
                 startTime: startTime,
                 duration: duration,
                 alternativeCount: alternativeCount,
-                locale: locale
+                locale: locale,
+                source: source
             )
             return
         }
@@ -74,7 +77,8 @@ final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
                 startTime: startTime,
                 duration: duration,
                 alternativeCount: alternativeCount,
-                locale: locale
+                locale: locale,
+                source: source
             )
         } else {
             // Filter out mismatched results - silently ignore

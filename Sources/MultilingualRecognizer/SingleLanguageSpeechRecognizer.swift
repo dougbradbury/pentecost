@@ -11,46 +11,35 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
     private var analyzer: SpeechAnalyzer?
 
     private var recognitionTask: Task<(), Never>?
+    private var analysisTask: Task<(), Never>?  // Task for analyzeSequence()
     private var converter = BufferConverter()
     private let ui: UserInterface
     private let speechProcessor: SpeechProcessor
     private let locale: Locale
     private let localeIdentifier: String
+    private let source: String
 
     var analyzerFormat: AVAudioFormat?
 
-    init(ui: UserInterface, speechProcessor: SpeechProcessor, locale: String) {
+    init(ui: UserInterface, speechProcessor: SpeechProcessor, locale: String, source: String) {
         self.ui = ui
         self.speechProcessor = speechProcessor
         self.localeIdentifier = locale
         self.locale = Locale(identifier: locale)
+        self.source = source
     }
 
     func setUpTranscriber() async throws {
         ui.status("🔧 Setting up \(localeIdentifier) transcriber...")
 
-        // Create transcriber for the specified language with retry mechanism
-        var retryCount = 0
-        let maxRetries = 3
-
-        while retryCount < maxRetries {
-            do {
-                transcriber = SpeechTranscriber(
-                    locale: locale,
-                    transcriptionOptions: [],
-                    reportingOptions: [.volatileResults],
-                    attributeOptions: [.audioTimeRange]
-                )
-                break // Success, exit retry loop
-            } catch {
-                retryCount += 1
-                if retryCount >= maxRetries {
-                    throw error // Re-throw final error
-                }
-                ui.status("⚠️ Transcriber setup failed, retrying... (\(retryCount)/\(maxRetries))")
-                try await Task.sleep(for: .milliseconds(500 * retryCount)) // Exponential backoff
-            }
-        }
+        // Step 1: Create transcriber for the specified language
+        // Note: Preset API may not be available in macOS 26.0, using manual configuration
+        transcriber = SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: [.audioTimeRange]
+        )
 
         guard let transcriber else {
             throw NSError(domain: "TranscriptionError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to setup \(localeIdentifier) transcriber"])
@@ -58,40 +47,38 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
 
         ui.status("✅ \(localeIdentifier) transcriber created")
 
-        // Create SpeechAnalyzer with single transcriber - retry if needed
-        retryCount = 0
-        while retryCount < maxRetries {
-            do {
-                analyzer = SpeechAnalyzer(modules: [transcriber])
-                break // Success, exit retry loop
-            } catch {
-                retryCount += 1
-                if retryCount >= maxRetries {
-                    throw error // Re-throw final error
-                }
-                ui.status("⚠️ SpeechAnalyzer creation failed, retrying... (\(retryCount)/\(maxRetries))")
-                try await Task.sleep(for: .milliseconds(500 * retryCount)) // Exponential backoff
-            }
-        }
+        // Step 2: Check if assets are available (optional but recommended)
+        // We'll skip the download step for now as it may block
 
-        ui.status("✅ SpeechAnalyzer created for \(localeIdentifier)")
-
-        // Get the best audio format for this transcriber
-        self.analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
-        ui.status("🎤 Optimal audio format for \(localeIdentifier): \(analyzerFormat?.description ?? "Unknown")")
-
-        // Create input stream
+        // Step 3: Create input stream
         (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
 
-        guard let inputSequence else { return }
+        guard let inputSequence else {
+            throw NSError(domain: "TranscriptionError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create input sequence"])
+        }
 
-        // Start recognition task for this language
+        // Step 4: Create analyzer and get audio format
+        // Use bestAvailableAudioFormat as recommended in docs
+        let audioFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+        guard let audioFormat else {
+            throw NSError(domain: "TranscriptionError", code: 1, userInfo: [NSLocalizedDescriptionKey: "No compatible audio format available"])
+        }
+        self.analyzerFormat = audioFormat
+        ui.status("🎤 Using audio format for \(localeIdentifier): \(audioFormat.description)")
+
+        analyzer = SpeechAnalyzer(modules: [transcriber])
+        ui.status("✅ SpeechAnalyzer created for \(localeIdentifier)")
+
+        // Step 7: Start reading results BEFORE starting analysis
+        // This is critical per Apple's example
         let ui = self.ui
         let processor = self.speechProcessor
         let locale = self.localeIdentifier
+        let source = self.source
+        let localTranscriber = transcriber
         recognitionTask = Task { @Sendable in
             do {
-                for try await case let result in transcriber.results {
+                for try await case let result in localTranscriber.results {
                     let text = String(result.text.characters)
                     let startTime = CMTimeGetSeconds(result.range.start)
                     let duration = CMTimeGetSeconds(result.range.duration)
@@ -101,7 +88,8 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
                         startTime: startTime,
                         duration: duration,
                         alternativeCount: result.alternatives.count,
-                        locale: locale
+                        locale: locale,
+                        source: source
                     )
                 }
             } catch {
@@ -109,8 +97,20 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
             }
         }
 
-        // Start the analyzer with the input sequence
-        try await analyzer?.start(inputSequence: inputSequence)
+        // Step 6: Start analysis using analyzeSequence (non-blocking, structured concurrency)
+        // We use a separate task so it doesn't block setup
+        let localAnalyzer = analyzer
+        analysisTask = Task { @Sendable in
+            do {
+                let lastSampleTime = try await localAnalyzer?.analyzeSequence(inputSequence)
+                ui.status("🎯 \(locale) analysis completed, last sample: \(lastSampleTime?.seconds ?? 0)")
+            } catch {
+                ui.status("❌ \(locale) analysis failed: \(error)")
+            }
+        }
+
+        // Give the analyzer a moment to actually start before returning
+        try await Task.sleep(for: .milliseconds(50))
         ui.status("🎯 \(localeIdentifier) SpeechAnalyzer started successfully!")
     }
 
@@ -133,14 +133,16 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         // Stop input stream first
         inputBuilder?.finish()
 
-        // Cancel recognition task to stop processing
+        // Cancel tasks
         recognitionTask?.cancel()
+        analysisTask?.cancel()
 
         // Give analyzer time to finish processing any pending input
         try await analyzer?.finalizeAndFinishThroughEndOfInput()
 
-        // Wait for recognition task to complete cancellation
+        // Wait for tasks to complete cancellation
         recognitionTask = nil
+        analysisTask = nil
 
         // Add brief delay to ensure Speech framework resources are released
         try await Task.sleep(for: .milliseconds(100))

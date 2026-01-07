@@ -8,7 +8,7 @@ final class BroadcastProcessor: @unchecked Sendable, SpeechProcessor {
         self.processors = processors
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String, source: String) async {
         // Process messages in parallel using TaskGroup
         await withTaskGroup(of: Void.self) { group in
             for processor in processors {
@@ -19,7 +19,8 @@ final class BroadcastProcessor: @unchecked Sendable, SpeechProcessor {
                         startTime: startTime,
                         duration: duration,
                         alternativeCount: alternativeCount,
-                        locale: locale
+                        locale: locale,
+                        source: source
                     )
                 }
             }

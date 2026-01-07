@@ -13,19 +13,22 @@ enum AudioError: Error {
 // MARK: - App Entry Point
 
 @available(macOS 26.0, *)
-func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, audioService: AudioEngineService) async -> (englishRecognizer: SingleLanguageSpeechRecognizer, frenchRecognizer: SingleLanguageSpeechRecognizer, audioEngine: AVAudioEngine)? {
+func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, audioService: AudioEngineService, source: String) async -> (englishRecognizer: SingleLanguageSpeechRecognizer, frenchRecognizer: SingleLanguageSpeechRecognizer, audioEngine: AVAudioEngine)? {
     ui.status("🎤 Setting up LOCAL audio capture (microphone)")
 
     do {
         // Create recognizers sequentially to avoid Speech framework conflicts
         ui.status("🔧 Creating English recognizer...")
-        let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US")
+        let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US", source: source)
 
         ui.status("🔧 Setting up English transcriber...")
         try await englishRecognizer.setUpTranscriber()
 
+        // Brief delay to prevent Speech framework race conditions
+        try await Task.sleep(for: .milliseconds(100))
+
         ui.status("🔧 Creating French recognizer...")
-        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
+        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA", source: source)
 
         ui.status("🔧 Setting up French transcriber...")
         try await frenchRecognizer.setUpTranscriber()
@@ -34,7 +37,7 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         try await Task.sleep(for: .milliseconds(100))
 
         // Set up audio engine with first input device (local microphone)
-        let audioEngine = try audioService.createFirstAudioEngine()
+        let audioEngine = try await audioService.createFirstAudioEngine()
 
         if let device = audioService.getFirstInputDevice() {
             ui.status("✅ LOCAL device: \(device.name)")
@@ -51,7 +54,7 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         ui.status("🎤 LOCAL tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for local audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { @Sendable [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
             guard let english = englishRecognizer, let french = frenchRecognizer else { return }
             Task { @Sendable [english, french] in
                 do {
@@ -78,19 +81,22 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
 }
 
 @available(macOS 26.0, *)
-func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, audioService: AudioEngineService) async -> (englishRecognizer: SingleLanguageSpeechRecognizer, frenchRecognizer: SingleLanguageSpeechRecognizer, audioEngine: AVAudioEngine)? {
+func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, audioService: AudioEngineService, source: String) async -> (englishRecognizer: SingleLanguageSpeechRecognizer, frenchRecognizer: SingleLanguageSpeechRecognizer, audioEngine: AVAudioEngine)? {
     ui.status("🔊 Setting up REMOTE audio capture (system/BlackHole)")
 
     do {
         // Create recognizers sequentially to avoid Speech framework conflicts
         ui.status("🔧 Creating English recognizer for REMOTE...")
-        let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US")
+        let englishRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "en-US", source: source)
 
         ui.status("🔧 Setting up English transcriber for REMOTE...")
         try await englishRecognizer.setUpTranscriber()
 
+        // Brief delay to prevent Speech framework race conditions
+        try await Task.sleep(for: .milliseconds(100))
+
         ui.status("🔧 Creating French recognizer for REMOTE...")
-        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA")
+        let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA", source: source)
 
         ui.status("🔧 Setting up French transcriber for REMOTE...")
         try await frenchRecognizer.setUpTranscriber()
@@ -99,7 +105,7 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         try await Task.sleep(for: .milliseconds(100))
 
         // Set up audio engine with second input device (remote/system audio)
-        let audioEngine = try audioService.createSecondAudioEngine()
+        let audioEngine = try await audioService.createSecondAudioEngine()
 
         if let device = audioService.getSecondInputDevice() {
             ui.status("✅ REMOTE device: \(device.name)")
@@ -116,7 +122,7 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         ui.status("🔊 REMOTE tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for remote audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { @Sendable [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
             guard let english = englishRecognizer, let french = frenchRecognizer else { return }
             Task { @Sendable [english, french] in
                 do {
@@ -244,11 +250,11 @@ func performCleanShutdown(
     ui: UserInterface,
     statusTimer: Timer,
     inputAudioEngine: AVAudioEngine,
-    remoteAudioEngine: AVAudioEngine,
+    remoteAudioEngine: AVAudioEngine?,
     inputEnglishRecognizer: SingleLanguageSpeechRecognizer,
     inputFrenchRecognizer: SingleLanguageSpeechRecognizer,
-    remoteEnglishRecognizer: SingleLanguageSpeechRecognizer,
-    remoteFrenchRecognizer: SingleLanguageSpeechRecognizer,
+    remoteEnglishRecognizer: SingleLanguageSpeechRecognizer?,
+    remoteFrenchRecognizer: SingleLanguageSpeechRecognizer?,
     keyboardMonitorTask: Task<Void, Never>?,
     originalTermios: termios?
 ) async {
@@ -269,11 +275,13 @@ func performCleanShutdown(
 
     // Stop audio engines first to prevent new audio processing
     inputAudioEngine.stop()
-    remoteAudioEngine.stop()
+    remoteAudioEngine?.stop()
 
     // Remove audio taps to stop audio callbacks
     inputAudioEngine.inputNode.removeTap(onBus: 0)
-    remoteAudioEngine.inputNode.removeTap(onBus: 0)
+    if let remoteAudioEngine = remoteAudioEngine {
+        remoteAudioEngine.inputNode.removeTap(onBus: 0)
+    }
 
     // Allow brief time for any pending audio processing to complete
     do {
@@ -286,8 +294,12 @@ func performCleanShutdown(
     do {
         try await inputEnglishRecognizer.finishTranscribing()
         try await inputFrenchRecognizer.finishTranscribing()
-        try await remoteEnglishRecognizer.finishTranscribing()
-        try await remoteFrenchRecognizer.finishTranscribing()
+        if let remoteEnglishRecognizer = remoteEnglishRecognizer {
+            try await remoteEnglishRecognizer.finishTranscribing()
+        }
+        if let remoteFrenchRecognizer = remoteFrenchRecognizer {
+            try await remoteFrenchRecognizer.finishTranscribing()
+        }
     } catch {
         ui.status("⚠️ Error during transcription cleanup: \(error)")
     }
@@ -391,19 +403,19 @@ func main() async {
     }
 
     // Set up input recognition (local microphone)
-    guard let (inputEnglishRecognizer, inputFrenchRecognizer, inputAudioEngine) = await setupInputRecognition(ui: ui, speechProcessor: localLanguageFilter, audioService: audioService) else {
+    guard let (inputEnglishRecognizer, inputFrenchRecognizer, inputAudioEngine) = await setupInputRecognition(ui: ui, speechProcessor: localLanguageFilter, audioService: audioService, source: "local") else {
         return
     }
 
-    // Brief delay between creating separate audio engines to avoid audio system conflicts
+    // Delay between creating separate audio engines to avoid audio system conflicts
     do {
-        try await Task.sleep(for: .milliseconds(200))
+        try await Task.sleep(for: .milliseconds(500))
     } catch {
         // Sleep interruption is not critical
     }
 
     // Set up remote recognition (system/BlackHole audio)
-    guard let (remoteEnglishRecognizer, remoteFrenchRecognizer, remoteAudioEngine) = await setupRemoteRecognition(ui: ui, speechProcessor: remoteLanguageFilter, audioService: audioService) else {
+    guard let (remoteEnglishRecognizer, remoteFrenchRecognizer, remoteAudioEngine) = await setupRemoteRecognition(ui: ui, speechProcessor: remoteLanguageFilter, audioService: audioService, source: "remote") else {
         return
     }
 

@@ -34,7 +34,7 @@ actor TranscriptFileProcessor: SpeechProcessor {
         }
     }
 
-    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String) async {
+    func process(text: String, isFinal: Bool, startTime: Double, duration: Double, alternativeCount: Int, locale: String, source: String) async {
         // Only process final messages
         guard isFinal else { return }
 
@@ -57,7 +57,9 @@ actor TranscriptFileProcessor: SpeechProcessor {
             let endDate = now.addingTimeInterval(duration)
             let endTime = formatter.string(from: endDate)
 
-            let entry = "\(timestamp) - \(endTime): \(text)\n"
+            // Prefix with source label (LOCAL or REMOTE)
+            let sourceLabel = source.uppercased()
+            let entry = "[\(sourceLabel)] \(timestamp) - \(endTime): \(text)\n"
 
             if let data = entry.data(using: .utf8) {
                 try fileHandle.write(contentsOf: data)

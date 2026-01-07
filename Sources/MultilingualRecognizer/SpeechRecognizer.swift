@@ -80,7 +80,8 @@ final class ProductionMultilingualRecognizer: @unchecked Sendable {
                         startTime: startTime,
                         duration: duration,
                         alternativeCount: result.alternatives.count,
-                        locale: "en-US"
+                        locale: "en-US",
+                        source: "unknown"
                     )
                 }
             } catch {
@@ -100,7 +101,8 @@ final class ProductionMultilingualRecognizer: @unchecked Sendable {
                         startTime: startTime,
                         duration: duration,
                         alternativeCount: result.alternatives.count,
-                        locale: "fr-FR"
+                        locale: "fr-FR",
+                        source: "unknown"
                     )
                 }
             } catch {

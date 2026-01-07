@@ -62,29 +62,56 @@ final class AudioDeviceManager {
     }
 
     /// Set the input device for an AVAudioEngine
-    func setInputDevice(_ device: AudioDevice, for audioEngine: AVAudioEngine) throws {
+    func setInputDevice(_ device: AudioDevice, for audioEngine: AVAudioEngine) async throws {
         guard device.hasInput else {
             throw AudioDeviceError.deviceHasNoInput
         }
 
-        let inputNode = audioEngine.inputNode
-        guard let inputUnit = inputNode.audioUnit else {
-            throw AudioDeviceError.cannotAccessAudioUnit
+        // Retry pattern to handle audio system initialization timing issues
+        var lastError: Error?
+        var retryCount = 0
+        let maxRetries = 5
+
+        while retryCount < maxRetries {
+            do {
+                // Try to access the input node - this can crash if audio system isn't ready
+                let inputNode = audioEngine.inputNode
+
+                // If we got here without crashing, check if audioUnit is available
+                guard let inputUnit = inputNode.audioUnit else {
+                    throw AudioDeviceError.cannotAccessAudioUnit
+                }
+
+                var deviceID = device.deviceID
+                let status = AudioUnitSetProperty(
+                    inputUnit,
+                    kAudioOutputUnitProperty_CurrentDevice,
+                    kAudioUnitScope_Global,
+                    0,
+                    &deviceID,
+                    UInt32(MemoryLayout<AudioDeviceID>.size)
+                )
+
+                if status != noErr {
+                    throw AudioDeviceError.failedToSetDevice(status)
+                }
+
+                // Success! Exit retry loop
+                return
+
+            } catch {
+                lastError = error
+                retryCount += 1
+
+                if retryCount < maxRetries {
+                    // Wait before retrying - exponential backoff
+                    try await Task.sleep(for: .milliseconds(100 * retryCount))
+                }
+            }
         }
 
-        var deviceID = device.deviceID
-        let status = AudioUnitSetProperty(
-            inputUnit,
-            kAudioOutputUnitProperty_CurrentDevice,
-            kAudioUnitScope_Global,
-            0,
-            &deviceID,
-            UInt32(MemoryLayout<AudioDeviceID>.size)
-        )
-
-        if status != noErr {
-            throw AudioDeviceError.failedToSetDevice(status)
-        }
+        // If we exhausted retries, throw the last error
+        throw lastError ?? AudioDeviceError.cannotAccessAudioUnit
     }
 
     // MARK: - Private Methods

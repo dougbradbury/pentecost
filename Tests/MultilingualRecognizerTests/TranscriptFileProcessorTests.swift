@@ -91,7 +91,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 1.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "en-US"
+            locale: "en-US",
+            source: "local"
         )
 
         let firstTimestamp = await processor.getCurrentSessionTimestamp()
@@ -109,7 +110,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 2.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "en-US"
+            locale: "en-US",
+            source: "local"
         )
 
         // Verify both files exist
@@ -131,7 +133,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 1.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "en-US"
+            locale: "en-US",
+            source: "local"
         )
 
         await processor.process(
@@ -140,7 +143,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 2.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "fr-FR"
+            locale: "fr-FR",
+            source: "remote"
         )
 
         // Close all files
@@ -157,7 +161,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 3.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "en-US"
+            locale: "en-US",
+            source: "local"
         )
     }
 
@@ -171,7 +176,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 1.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "en-US"
+            locale: "en-US",
+            source: "local"
         )
 
         await processor.process(
@@ -180,7 +186,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 2.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "fr-FR"
+            locale: "fr-FR",
+            source: "remote"
         )
 
         _ = await processor.getCurrentSessionTimestamp()
@@ -198,7 +205,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 3.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "en-US"
+            locale: "en-US",
+            source: "local"
         )
 
         await processor.process(
@@ -207,7 +215,8 @@ final class TranscriptFileProcessorTests: XCTestCase {
             startTime: 4.0,
             duration: 0.5,
             alternativeCount: 1,
-            locale: "fr-FR"
+            locale: "fr-FR",
+            source: "remote"
         )
 
         // Should have 4 total files: 2 languages × 2 timestamps
