@@ -419,6 +419,15 @@ func main() async {
         return
     }
 
+    // Critical delay: Let all Speech framework resources fully initialize
+    // Without this, the framework crashes when audio starts flowing
+    do {
+        ui.status("⏳ Letting Speech framework stabilize...")
+        try await Task.sleep(for: .milliseconds(1000))
+    } catch {
+        // Sleep interruption is not critical
+    }
+
     // Enable raw terminal mode for keyboard input
     let originalTermios = enableRawMode()
     if originalTermios == nil {

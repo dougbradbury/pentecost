@@ -47,8 +47,9 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
 
         ui.status("✅ \(localeIdentifier) transcriber created")
 
-        // Step 2: Check if assets are available (optional but recommended)
-        // We'll skip the download step for now as it may block
+        // Step 2: Brief delay to let Speech framework fully initialize the transcriber
+        // Without this, bestAvailableAudioFormat() can crash during type instantiation
+        try await Task.sleep(for: .milliseconds(100))
 
         // Step 3: Create input stream
         (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
@@ -57,8 +58,8 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
             throw NSError(domain: "TranscriptionError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create input sequence"])
         }
 
-        // Step 4: Create analyzer and get audio format
-        // Use bestAvailableAudioFormat as recommended in docs
+        // Step 4: Get audio format from Speech framework
+        // Query the best available format that's compatible with this transcriber
         let audioFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
         guard let audioFormat else {
             throw NSError(domain: "TranscriptionError", code: 1, userInfo: [NSLocalizedDescriptionKey: "No compatible audio format available"])
@@ -130,17 +131,22 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
     func finishTranscribing() async throws {
         ui.status("🛑 Finishing \(localeIdentifier) transcription...")
 
-        // Stop input stream first
+        // Step 1: Stop input stream to signal no more audio coming
         inputBuilder?.finish()
 
-        // Cancel tasks
+        // Step 2: Let analyzer finalize gracefully - this will complete the analyzeSequence() call
+        do {
+            try await analyzer?.finalizeAndFinishThroughEndOfInput()
+        } catch {
+            // Ignore errors during finalization - analyzer may already be cancelled
+            ui.status("⚠️ \(localeIdentifier) finalization error (expected during shutdown): \(error)")
+        }
+
+        // Step 3: Now cancel tasks - analysis task should be done, but recognition task may still be reading
         recognitionTask?.cancel()
         analysisTask?.cancel()
 
-        // Give analyzer time to finish processing any pending input
-        try await analyzer?.finalizeAndFinishThroughEndOfInput()
-
-        // Wait for tasks to complete cancellation
+        // Step 4: Wait for tasks to complete
         recognitionTask = nil
         analysisTask = nil
 
