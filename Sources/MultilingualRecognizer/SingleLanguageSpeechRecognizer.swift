@@ -67,8 +67,14 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         self.analyzerFormat = audioFormat
         ui.status("🎤 Using audio format for \(localeIdentifier): \(audioFormat.description)")
 
+        // Create analyzer
         analyzer = SpeechAnalyzer(modules: [transcriber])
         ui.status("✅ SpeechAnalyzer created for \(localeIdentifier)")
+
+        // Preheat the analyzer to load resources and improve first-result speed
+        // This loads models into memory before audio starts flowing
+        try await analyzer?.prepareToAnalyze(in: audioFormat)
+        ui.status("🔥 \(localeIdentifier) analyzer preheated")
 
         // Step 7: Start reading results BEFORE starting analysis
         // This is critical per Apple's example
