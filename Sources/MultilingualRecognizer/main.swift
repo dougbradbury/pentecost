@@ -378,13 +378,17 @@ func main() async {
     let broadcastProcessor = BroadcastProcessor(processors: [terminalProcessor, transcriptProcessor])
 
     // LOCAL (microphone) processing chain
+    // Chain: Artifact Filter → Min Length Filter → Language Filter → Translation → Broadcast
     let localTranslationProcessor = TranslationProcessor(nextProcessor: broadcastProcessor)
-    let localLanguageFilter = LanguageFilterProcessor(nextProcessor: localTranslationProcessor)
+    let localMinLengthFilter = MinimumLengthFilterProcessor(nextProcessor: localTranslationProcessor)
+    let localLanguageFilter = LanguageFilterProcessor(nextProcessor: localMinLengthFilter)
     let localArtifactFilter = ArtifactFilterProcessor(nextProcessor: localLanguageFilter)
 
     // REMOTE (BlackHole) processing chain
+    // Chain: Artifact Filter → Min Length Filter → Language Filter → Translation → Broadcast
     let remoteTranslationProcessor = TranslationProcessor(nextProcessor: broadcastProcessor)
-    let remoteLanguageFilter = LanguageFilterProcessor(nextProcessor: remoteTranslationProcessor)
+    let remoteMinLengthFilter = MinimumLengthFilterProcessor(nextProcessor: remoteTranslationProcessor)
+    let remoteLanguageFilter = LanguageFilterProcessor(nextProcessor: remoteMinLengthFilter)
     let remoteArtifactFilter = ArtifactFilterProcessor(nextProcessor: remoteLanguageFilter)
 
     // Create audio service and setup coordinator with dependency injection
