@@ -47,9 +47,10 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
 
         ui.status("✅ \(localeIdentifier) transcriber created")
 
-        // Step 2: Brief delay to let Speech framework fully initialize the transcriber
+        // Step 2: Longer delay to let Speech framework fully initialize the transcriber
         // Without this, bestAvailableAudioFormat() can crash during type instantiation
-        try await Task.sleep(for: .milliseconds(100))
+        // Increased to 200ms to prevent race conditions when creating multiple recognizers
+        try await Task.sleep(for: .milliseconds(200))
 
         // Step 3: Create input stream
         (inputSequence, inputBuilder) = AsyncStream<AnalyzerInput>.makeStream()
