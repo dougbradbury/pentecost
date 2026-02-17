@@ -130,6 +130,13 @@ final class TerminalRenderer: @unchecked Sendable {
         render(englishMessages: englishMessages, frenchMessages: frenchMessages)
     }
 
+    // Full screen clear then render - use when clearing the transcript
+    func clearAndRender(englishMessages: [SpeechMessage], frenchMessages: [SpeechMessage]) {
+        lastRenderTime = Date.distantPast
+        isFirstRender = true  // Force full redraw instead of differential update
+        render(englishMessages: englishMessages, frenchMessages: frenchMessages)
+    }
+
     private func performDifferentialUpdate(newLines: [String]) {
         let maxLines = max(newLines.count, previousLines.count)
 

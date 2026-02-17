@@ -79,7 +79,9 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
     func clear() async {
         await englishBuffer.clearMessages()
         await frenchBuffer.clearMessages()
-        await render()
+        let englishMessages = await englishBuffer.getMessages()
+        let frenchMessages = await frenchBuffer.getMessages()
+        terminalRenderer.clearAndRender(englishMessages: englishMessages, frenchMessages: frenchMessages)
     }
 }
 
