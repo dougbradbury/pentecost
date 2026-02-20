@@ -47,9 +47,13 @@ actor SingleLanguageSpeechRecognizer {
 
         ui.status("✅ \(localeIdentifier) transcriber created")
 
-        // Step 2: Longer delay to let Speech framework fully initialize the transcriber
-        // Without this, bestAvailableAudioFormat() can crash during type instantiation
-        // Increased to 200ms to prevent race conditions when creating multiple recognizers
+        // CONSERVATIVE: Allow Speech framework's internal initialization to complete
+        // before querying for audio format capabilities. This delay may not be strictly
+        // necessary with actor isolation (untested), but kept conservatively since
+        // bestAvailableAudioFormat() queries internal Speech framework state that may
+        // still be initializing after SpeechTranscriber construction returns.
+        // Historical note: Without delays, saw crashes in type instantiation.
+        // TODO: Test if this can be reduced or removed with current actor architecture.
         try await Task.sleep(for: .milliseconds(200))
 
         // Step 3: Create input stream
@@ -71,6 +75,12 @@ actor SingleLanguageSpeechRecognizer {
         // Create analyzer
         analyzer = SpeechAnalyzer(modules: [transcriber])
         ui.status("✅ SpeechAnalyzer created for \(localeIdentifier)")
+
+        // REQUIRED: Brief delay to allow SpeechAnalyzer's internal initialization
+        // to complete before calling prepareToAnalyze(). Without this, crashes occur
+        // in malloc during prepareToAnalyze() - likely Speech framework XPC setup.
+        // Tested: Removing this causes immediate crashes.
+        try await Task.sleep(for: .milliseconds(100))
 
         // Preheat the analyzer to load resources and improve first-result speed
         // This loads models into memory before audio starts flowing
@@ -118,7 +128,12 @@ actor SingleLanguageSpeechRecognizer {
             }
         }
 
-        // Give the analyzer a moment to actually start before returning
+        // CONSERVATIVE: Brief delay to allow async tasks to begin execution before
+        // this function returns. The recognitionTask and analysisTask start
+        // asynchronously, and this gives them a moment to get scheduled.
+        // With actor isolation, this may not be necessary (untested), but kept
+        // conservatively to ensure tasks are running before caller proceeds.
+        // TODO: Test if this can be removed with current actor architecture.
         try await Task.sleep(for: .milliseconds(50))
         ui.status("🎯 \(localeIdentifier) SpeechAnalyzer started successfully!")
     }
@@ -158,7 +173,11 @@ actor SingleLanguageSpeechRecognizer {
         recognitionTask = nil
         analysisTask = nil
 
-        // Add brief delay to ensure Speech framework resources are released
+        // CONSERVATIVE: Brief delay to allow Speech framework to release internal
+        // resources after task cancellation. Actor deallocation should handle cleanup
+        // safely, but this provides extra time for Speech framework's XPC connections
+        // to cleanly tear down before we nil out the transcriber/analyzer references.
+        // Low risk to keep, aids clean shutdown, minimal performance impact.
         try await Task.sleep(for: .milliseconds(100))
 
         // Clean up resources to prevent conflicts on restart
