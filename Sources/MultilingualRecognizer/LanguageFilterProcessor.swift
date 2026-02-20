@@ -2,7 +2,7 @@ import Foundation
 import NaturalLanguage
 
 @available(macOS 26.0, *)
-final class LanguageFilterProcessor: @unchecked Sendable, SpeechProcessor {
+final class LanguageFilterProcessor: SpeechProcessor {
     private let nextProcessor: SpeechProcessor
     private let confidenceThreshold: Float
 

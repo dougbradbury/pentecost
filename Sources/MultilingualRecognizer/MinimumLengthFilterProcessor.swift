@@ -1,7 +1,7 @@
 import Foundation
 
 @available(macOS 26.0, *)
-final class MinimumLengthFilterProcessor: @unchecked Sendable, SpeechProcessor {
+final class MinimumLengthFilterProcessor: SpeechProcessor {
     private let nextProcessor: SpeechProcessor
     private let minimumWordCount: Int
 

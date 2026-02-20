@@ -46,7 +46,7 @@ struct SpeechMessage {
 }
 
 @available(macOS 26.0, *)
-final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
+final class TwoColumnTerminalProcessor: SpeechProcessor {
     private let englishBuffer: MessageBuffer
     private let frenchBuffer: MessageBuffer
     private let terminalRenderer: TerminalRenderer
@@ -72,7 +72,7 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
     private func render() async {
         let englishMessages = await englishBuffer.getMessages()
         let frenchMessages = await frenchBuffer.getMessages()
-        terminalRenderer.render(englishMessages: englishMessages, frenchMessages: frenchMessages)
+        await terminalRenderer.render(englishMessages: englishMessages, frenchMessages: frenchMessages)
     }
 
     /// Clear all message buffers and the screen
@@ -81,7 +81,7 @@ final class TwoColumnTerminalProcessor: @unchecked Sendable, SpeechProcessor {
         await frenchBuffer.clearMessages()
         let englishMessages = await englishBuffer.getMessages()
         let frenchMessages = await frenchBuffer.getMessages()
-        terminalRenderer.clearAndRender(englishMessages: englishMessages, frenchMessages: frenchMessages)
+        await terminalRenderer.clearAndRender(englishMessages: englishMessages, frenchMessages: frenchMessages)
     }
 }
 

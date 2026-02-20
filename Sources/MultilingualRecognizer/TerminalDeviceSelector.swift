@@ -20,7 +20,9 @@ struct TerminalDeviceSelector: DeviceSelector {
     func selectFirstInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
         print("🎤 Select FIRST input device (LOCAL/MIC) (1-\(devices.count), or press Enter for default): ", terminator: "")
 
-        if let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) {
+        // Capture CharacterSet to prevent release-build optimizer from deallocating it prematurely
+        let whitespace = CharacterSet.whitespacesAndNewlines
+        if let input = readLine()?.trimmingCharacters(in: whitespace) {
             if input.isEmpty {
                 // Use default device
                 return devices.first { $0.isDefaultInput } ?? devices[0]
@@ -40,7 +42,9 @@ struct TerminalDeviceSelector: DeviceSelector {
     func selectSecondInputDevice(from devices: [AudioDevice]) async throws -> AudioDevice {
         print("🔊 Select SECOND input device (REMOTE/SYSTEM) (1-\(devices.count), or press Enter for BlackHole): ", terminator: "")
 
-        if let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines) {
+        // Capture CharacterSet to prevent release-build optimizer from deallocating it prematurely
+        let whitespace = CharacterSet.whitespacesAndNewlines
+        if let input = readLine()?.trimmingCharacters(in: whitespace) {
             if input.isEmpty {
                 // Try to find BlackHole as default for second input
                 return devices.first { $0.name.contains("BlackHole") } ?? devices[0]

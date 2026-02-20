@@ -1,7 +1,7 @@
 import Foundation
 
 @available(macOS 26.0, *)
-final class ArtifactFilterProcessor: @unchecked Sendable, SpeechProcessor {
+final class ArtifactFilterProcessor: SpeechProcessor {
     private let nextProcessor: SpeechProcessor
     private let commaThreshold: Double
     private let repetitionThreshold: Int

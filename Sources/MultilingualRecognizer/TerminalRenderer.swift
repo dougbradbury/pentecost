@@ -2,7 +2,7 @@ import Foundation
 import Darwin
 
 @available(macOS 26.0, *)
-final class TerminalRenderer: @unchecked Sendable {
+actor TerminalRenderer {
     private let leftMargin = 0
 
     // Store previous rendered state for differential updates

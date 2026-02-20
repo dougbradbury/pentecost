@@ -3,7 +3,7 @@ import Foundation
 @preconcurrency import AVFoundation
 
 @available(macOS 26.0, *)
-final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
+actor SingleLanguageSpeechRecognizer {
     private var inputSequence: AsyncStream<AnalyzerInput>?
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
 
@@ -12,7 +12,7 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
 
     private var recognitionTask: Task<(), Never>?
     private var analysisTask: Task<(), Never>?  // Task for analyzeSequence()
-    private var converter = BufferConverter()
+    private let converter = BufferConverter()
     private let ui: UserInterface
     private let speechProcessor: SpeechProcessor
     private let locale: Locale
@@ -84,7 +84,8 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         let locale = self.localeIdentifier
         let source = self.source
         let localTranscriber = transcriber
-        recognitionTask = Task { @Sendable in
+
+        recognitionTask = Task {
             do {
                 for try await case let result in localTranscriber.results {
                     let text = String(result.text.characters)
@@ -108,7 +109,7 @@ final class SingleLanguageSpeechRecognizer: @unchecked Sendable {
         // Step 6: Start analysis using analyzeSequence (non-blocking, structured concurrency)
         // We use a separate task so it doesn't block setup
         let localAnalyzer = analyzer
-        analysisTask = Task { @Sendable in
+        analysisTask = Task {
             do {
                 let lastSampleTime = try await localAnalyzer?.analyzeSequence(inputSequence)
                 ui.status("🎯 \(locale) analysis completed, last sample: \(lastSampleTime?.seconds ?? 0)")

@@ -2,7 +2,7 @@ import Foundation
 import Translation
 
 @available(macOS 26.0, *)
-final class TranslationProcessor: @unchecked Sendable, SpeechProcessor {
+final class TranslationProcessor: SpeechProcessor {
     private let nextProcessor: SpeechProcessor
     private let minimumWordCount: Int
 

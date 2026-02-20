@@ -1,7 +1,7 @@
 import Foundation
 
 @available(macOS 26.0, *)
-final class BroadcastProcessor: @unchecked Sendable, SpeechProcessor {
+final class BroadcastProcessor: SpeechProcessor {
     private let processors: [SpeechProcessor]
 
     init(processors: [SpeechProcessor]) {

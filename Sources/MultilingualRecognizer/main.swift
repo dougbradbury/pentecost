@@ -54,9 +54,10 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         ui.status("🎤 LOCAL tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for local audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { @Sendable [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
+        // Note: No Task wrapper needed - actor isolation handles serialization
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
             guard let english = englishRecognizer, let french = frenchRecognizer else { return }
-            Task { @Sendable [english, french] in
+            Task {
                 do {
                     try await english.streamAudioToTranscriber(buffer)
                     try await french.streamAudioToTranscriber(buffer)
@@ -122,9 +123,10 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         ui.status("🔊 REMOTE tap format: \(tapFormat.sampleRate)Hz, \(tapFormat.channelCount) channels")
 
         // Install audio tap for remote audio - stream to both recognizers
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { @Sendable [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
+        // Note: Actor isolation ensures safe concurrent access to recognizers
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: tapFormat) { [weak englishRecognizer, weak frenchRecognizer] buffer, _ in
             guard let english = englishRecognizer, let french = frenchRecognizer else { return }
-            Task { @Sendable [english, french] in
+            Task {
                 do {
                     try await english.streamAudioToTranscriber(buffer)
                     try await french.streamAudioToTranscriber(buffer)
