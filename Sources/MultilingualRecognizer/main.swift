@@ -24,14 +24,9 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         ui.status("🔧 Setting up English transcriber...")
         try await englishRecognizer.setUpTranscriber()
 
-        // REQUIRED: Speech framework's internal XPC services need time to initialize
-        // between creating multiple recognizers. Without this delay, the second
-        // recognizer crashes during Swift metadata instantiation in the Speech
-        // framework's type system. This is a Speech framework limitation, not a
-        // Swift concurrency issue - actor isolation fixes our races but can't
-        // eliminate the framework's internal initialization requirements.
-        // Tested: Removing this causes crashes. Minimum safe value: 300ms.
-        try await Task.sleep(for: .milliseconds(300))
+        // REMOVED DELAY FOR APPLE FEEDBACK CRASH REPRODUCTION
+        // Original workaround: try await Task.sleep(for: .milliseconds(300))
+        // Without this delay: second recognizer crashes during Swift metadata instantiation
 
         ui.status("🔧 Creating French recognizer...")
         let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA", source: source)
@@ -39,10 +34,9 @@ func setupInputRecognition(ui: UserInterface, speechProcessor: SpeechProcessor, 
         ui.status("🔧 Setting up French transcriber...")
         try await frenchRecognizer.setUpTranscriber()
 
-        // REQUIRED: Allow Speech framework XPC connections to fully establish
-        // before creating the audio engine that will stream data to them.
-        // Tested: Removing this causes crashes during audio startup.
-        try await Task.sleep(for: .milliseconds(300))
+        // REMOVED DELAY FOR APPLE FEEDBACK CRASH REPRODUCTION
+        // Original workaround: try await Task.sleep(for: .milliseconds(300))
+        // Without this delay: crashes during audio startup
 
         // Set up audio engine with first input device (local microphone)
         let audioEngine = try await audioService.createFirstAudioEngine()
@@ -101,14 +95,9 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         ui.status("🔧 Setting up English transcriber for REMOTE...")
         try await englishRecognizer.setUpTranscriber()
 
-        // REQUIRED: Speech framework's internal XPC services need time to initialize
-        // between creating multiple recognizers. Without this delay, the second
-        // recognizer crashes during Swift metadata instantiation in the Speech
-        // framework's type system. This is a Speech framework limitation, not a
-        // Swift concurrency issue - actor isolation fixes our races but can't
-        // eliminate the framework's internal initialization requirements.
-        // Tested: Removing this causes crashes. Minimum safe value: 300ms.
-        try await Task.sleep(for: .milliseconds(300))
+        // REMOVED DELAY FOR APPLE FEEDBACK CRASH REPRODUCTION
+        // Original workaround: try await Task.sleep(for: .milliseconds(300))
+        // Without this delay: second recognizer crashes during Swift metadata instantiation
 
         ui.status("🔧 Creating French recognizer for REMOTE...")
         let frenchRecognizer = SingleLanguageSpeechRecognizer(ui: ui, speechProcessor: speechProcessor, locale: "fr-CA", source: source)
@@ -116,10 +105,9 @@ func setupRemoteRecognition(ui: UserInterface, speechProcessor: SpeechProcessor,
         ui.status("🔧 Setting up French transcriber for REMOTE...")
         try await frenchRecognizer.setUpTranscriber()
 
-        // REQUIRED: Allow Speech framework XPC connections to fully establish
-        // before creating the audio engine that will stream data to them.
-        // Tested: Removing this causes crashes during audio startup.
-        try await Task.sleep(for: .milliseconds(300))
+        // REMOVED DELAY FOR APPLE FEEDBACK CRASH REPRODUCTION
+        // Original workaround: try await Task.sleep(for: .milliseconds(300))
+        // Without this delay: crashes during audio startup
 
         // Set up audio engine with second input device (remote/system audio)
         let audioEngine = try await audioService.createSecondAudioEngine()
