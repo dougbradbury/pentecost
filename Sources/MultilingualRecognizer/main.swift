@@ -349,6 +349,9 @@ func performCleanShutdown(
         // Sleep interrupted, continue cleanup
     }
 
+    // Close transcript files and write FINISHED tag
+    await transcriptProcessor?.closeAllFiles()
+
     // Finish transcription in order to properly close Speech framework resources
     do {
         try await inputEnglishRecognizer.finishTranscribing()

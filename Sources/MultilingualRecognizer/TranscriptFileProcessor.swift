@@ -134,10 +134,21 @@ actor TranscriptFileProcessor: SpeechProcessor {
         return newTimestamp
     }
 
-    /// Close all currently open transcript files
+    /// Close all currently open transcript files and mark them as finished
     func closeAllFiles() {
+        // Add FINISHED tag to all open files before closing
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        let finishTime = formatter.string(from: Date())
+        let finishTag = "\n\n# FINISHED: \(finishTime)\n"
+
         for (locale, handle) in openFiles {
             do {
+                // Write FINISHED tag
+                if let tagData = finishTag.data(using: .utf8) {
+                    try handle.write(contentsOf: tagData)
+                }
+
                 try handle.synchronize() // Flush to disk
                 try handle.close()
             } catch {
