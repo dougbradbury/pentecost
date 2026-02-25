@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# Example script to summarize a meeting transcript using Claude CLI
+#
+# Usage: claude-summarize.sh <transcript_file>
+#
+# This script is called automatically by Pentecost when a transcript ends.
+# You can customize the prompt and output format as needed.
+
+set -e  # Exit on error
+
+# Check if transcript file argument provided
+if [ -z "$1" ]; then
+    echo "Error: No transcript file specified"
+    exit 1
+fi
+
+TRANSCRIPT_FILE="$1"
+
+# Check if file exists
+if [ ! -f "$TRANSCRIPT_FILE" ]; then
+    echo "Error: Transcript file not found: $TRANSCRIPT_FILE"
+    exit 1
+fi
+
+# Generate summary filename
+SUMMARY_FILE="${TRANSCRIPT_FILE%.txt}_summary.md"
+
+# Check if Claude CLI is available
+if ! command -v claude &> /dev/null; then
+    echo "Error: Claude CLI not found. Install from: https://github.com/anthropics/claude-cli"
+    exit 1
+fi
+
+echo "Summarizing transcript: $TRANSCRIPT_FILE"
+echo "Output will be saved to: $SUMMARY_FILE"
+
+# Call Claude to summarize the transcript
+claude chat << EOF > "$SUMMARY_FILE"
+Please analyze the following meeting transcript and provide a comprehensive summary.
+
+Transcript file: $TRANSCRIPT_FILE
+
+Please read the transcript and provide:
+
+1. **Meeting Summary** (2-3 sentences)
+   - Brief overview of what was discussed
+
+2. **Key Discussion Points**
+   - Main topics covered
+   - Important questions raised
+
+3. **Decisions Made**
+   - Concrete decisions reached
+   - Commitments made by participants
+
+4. **Action Items**
+   - Tasks to be completed
+   - Responsible parties (if mentioned)
+   - Deadlines (if mentioned)
+
+5. **Follow-up Required**
+   - Open questions
+   - Topics requiring further discussion
+
+Please format your response in clean Markdown.
+
+---
+
+$(cat "$TRANSCRIPT_FILE")
+EOF
+
+# Check if summary was created
+if [ -f "$SUMMARY_FILE" ]; then
+    echo "✅ Summary saved successfully: $SUMMARY_FILE"
+
+    # Optional: Open the summary in default editor
+    # open "$SUMMARY_FILE"
+
+    # Optional: Send notification
+    osascript -e "display notification \"Meeting summary generated\" with title \"Pentecost\""
+else
+    echo "❌ Failed to create summary"
+    exit 1
+fi

@@ -11,6 +11,7 @@ Pentecost is a real-time speech recognition and translation application that cap
 - **⚡ Live Translation**: Instant translation between English ↔ French
 - **📊 Two-Column Display**: Side-by-side English and French transcription with timestamps
 - **📝 Meeting Transcripts**: Automatic transcript saving with weekly organization
+- **🪝 Extensible Hooks**: Run custom commands when transcripts end (e.g., AI summarization)
 - **🎛️ Dynamic Terminal**: Responsive interface that adapts to any terminal size
 - **🔊 Device Selection**: Interactive audio device selection for optimal setup
 
@@ -41,6 +42,32 @@ swift build
 3. **Choose REMOTE device** - System audio capture (use BlackHole or aggregate device for remote participants)
 4. **Start speaking** - The app will transcribe and translate in real-time
 5. **View results** - English and French appear in side-by-side columns with live translation
+6. **Press Ctrl+N** - Start a new transcript (triggers hooks for previous transcript)
+7. **Press Ctrl+C** - Shutdown (triggers hooks for final transcript)
+
+### Keyboard Shortcuts
+
+- **Ctrl+N**: Start new transcript file (clears display, runs hooks on previous transcript)
+- **Ctrl+C**: Graceful shutdown (runs hooks, saves transcripts)
+
+## Hooks System
+
+Pentecost includes a flexible hook system to run custom commands when transcripts end. Perfect for:
+- **AI Summarization**: Automatically summarize meetings with Claude or other AI
+- **Backup**: Copy transcripts to cloud storage
+- **Notifications**: Alert when meetings end
+- **Custom Processing**: Run any command with transcript data
+
+**Quick Setup**:
+```bash
+# Copy example configuration
+cp hooks.yaml.example ~/.pentecost/hooks.yaml
+
+# Edit and enable hooks you want
+nano ~/.pentecost/hooks.yaml
+```
+
+See [HOOKS.md](HOOKS.md) for complete documentation and examples.
 
 ## Audio Setup
 

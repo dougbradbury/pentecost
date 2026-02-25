@@ -1,0 +1,52 @@
+# Pentecost Hooks Configuration Example
+# Copy this file to ~/.pentecost/hooks.yaml and customize for your needs
+#
+# Available events:
+#   on_transcript_end  - Triggered when transcript ends (app shutdown or Ctrl+N)
+#   on_transcript_start - Triggered when new transcript starts (Ctrl+N)
+#
+# Available context variables (use {variable_name} in commands):
+#   {transcript_file} - Full path to the transcript file
+#   {timestamp}       - ISO8601 timestamp when event occurred
+#   {event}           - Event type (shutdown, new_transcript)
+#
+# Hook properties:
+#   name    - Human-readable name for the hook
+#   command - Shell command to execute (supports context variable substitution)
+#   enabled - Set to true to enable, false to disable
+#   async   - If true, runs in background; if false, blocks until complete
+#   timeout - (optional) Maximum seconds to run before terminating
+
+hooks:
+  on_transcript_end:
+    - name: "Claude Summarizer"
+      command: "~/.pentecost/scripts/claude-summarize.sh {transcript_file}"
+      enabled: false
+      async: true
+      timeout: 300
+
+    - name: "Backup to Dropbox"
+      command: "cp {transcript_file} ~/Dropbox/meetings/"
+      enabled: false
+      async: true
+
+    - name: "Notify via osascript"
+      command: "osascript -e 'display notification \"Meeting transcript saved at {timestamp}\" with title \"Pentecost\"'"
+      enabled: false
+      async: true
+
+    - name: "Custom processing"
+      command: "echo 'Transcript ended at {timestamp}: {transcript_file}' >> ~/pentecost-log.txt"
+      enabled: false
+      async: true
+
+  on_transcript_start:
+    - name: "Clear notification"
+      command: "osascript -e 'display notification \"New transcript started\" with title \"Pentecost\"'"
+      enabled: false
+      async: true
+
+    - name: "Log start time"
+      command: "echo 'Started new transcript at {timestamp}' >> ~/pentecost-log.txt"
+      enabled: false
+      async: true

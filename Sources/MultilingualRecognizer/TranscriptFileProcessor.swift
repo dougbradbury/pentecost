@@ -151,4 +151,19 @@ actor TranscriptFileProcessor: SpeechProcessor {
     func getCurrentSessionTimestamp() -> String {
         return sessionTimestamp
     }
+
+    /// Get the path to the current transcript file for a specific locale
+    /// - Parameter locale: The locale identifier (e.g., "en-US")
+    /// - Returns: Full path to the transcript file, or nil if no file exists yet
+    func getCurrentTranscriptPath(for locale: String = "en-US") -> String? {
+        let weeklyDirectory = getWeeklyDirectory()
+        let transcriptsDirectory = weeklyDirectory.appendingPathComponent("transcripts")
+        let filename = "transcript_\(sessionTimestamp)_\(locale).txt"
+        let fileURL = transcriptsDirectory.appendingPathComponent(filename)
+
+        if fileManager.fileExists(atPath: fileURL.path) {
+            return fileURL.path
+        }
+        return nil
+    }
 }

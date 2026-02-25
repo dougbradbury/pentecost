@@ -218,7 +218,8 @@ func disableRawMode(_ originalTermios: termios) {
 func startKeyboardMonitoring(
     transcriptProcessor: TranscriptFileProcessor,
     terminalProcessor: TwoColumnTerminalProcessor,
-    ui: UserInterface
+    ui: UserInterface,
+    hookManager: HookManager?
 ) -> Task<Void, Never> {
     return Task {
         var buffer = [UInt8](repeating: 0, count: 16)
@@ -241,7 +242,8 @@ func startKeyboardMonitoring(
                         await handleNewTranscriptCommand(
                             transcriptProcessor: transcriptProcessor,
                             terminalProcessor: terminalProcessor,
-                            ui: ui
+                            ui: ui,
+                            hookManager: hookManager
                         )
                     }
                 }
@@ -257,10 +259,35 @@ func startKeyboardMonitoring(
 func handleNewTranscriptCommand(
     transcriptProcessor: TranscriptFileProcessor,
     terminalProcessor: TwoColumnTerminalProcessor,
-    ui: UserInterface
+    ui: UserInterface,
+    hookManager: HookManager?
 ) async {
+    // Get the current transcript file before starting a new one
+    let oldTranscriptPath = await transcriptProcessor.getCurrentTranscriptPath()
+
+    // Execute hooks for transcript end
+    if let oldTranscriptPath {
+        let context: [String: String] = [
+            "transcript_file": oldTranscriptPath,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+            "event": "new_transcript"
+        ]
+        await hookManager?.executeHooks(event: "on_transcript_end", context: context)
+    }
+
+    // Start new transcript
     _ = await transcriptProcessor.startNewTranscriptFile()
     await terminalProcessor.clear()
+
+    // Execute hooks for transcript start
+    let newTranscriptPath = await transcriptProcessor.getCurrentTranscriptPath()
+    if let newTranscriptPath {
+        let context: [String: String] = [
+            "transcript_file": newTranscriptPath,
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ]
+        await hookManager?.executeHooks(event: "on_transcript_start", context: context)
+    }
 }
 
 @available(macOS 26.0, *)
@@ -274,8 +301,19 @@ func performCleanShutdown(
     remoteEnglishRecognizer: SingleLanguageSpeechRecognizer?,
     remoteFrenchRecognizer: SingleLanguageSpeechRecognizer?,
     keyboardMonitorTask: Task<Void, Never>?,
-    originalTermios: termios?
+    originalTermios: termios?,
+    transcriptProcessor: TranscriptFileProcessor?,
+    hookManager: HookManager?
 ) async {
+    // Execute hooks for transcript end (on shutdown)
+    if let transcriptPath = await transcriptProcessor?.getCurrentTranscriptPath() {
+        let context: [String: String] = [
+            "transcript_file": transcriptPath,
+            "timestamp": ISO8601DateFormatter().string(from: Date()),
+            "event": "shutdown"
+        ]
+        await hookManager?.executeHooks(event: "on_transcript_end", context: context)
+    }
     // Clear screen for clean shutdown message display
     print("\u{001B}[2J\u{001B}[H", terminator: "")
 
@@ -388,6 +426,9 @@ func main() async {
 
     ui.status("✅ Permissions granted")
 
+    // Initialize hook manager for extensibility
+    let hookManager = HookManager()
+
     // Create separate processing chains for each audio stream
 
     // Shared processors
@@ -459,7 +500,8 @@ func main() async {
     let keyboardMonitorTask = startKeyboardMonitoring(
         transcriptProcessor: transcriptProcessor,
         terminalProcessor: terminalProcessor,
-        ui: ui
+        ui: ui,
+        hookManager: hookManager
     )
 
     // Status updates every 30 seconds
@@ -489,7 +531,9 @@ func main() async {
         remoteEnglishRecognizer: remoteEnglishRecognizer,
         remoteFrenchRecognizer: remoteFrenchRecognizer,
         keyboardMonitorTask: keyboardMonitorTask,
-        originalTermios: originalTermios
+        originalTermios: originalTermios,
+        transcriptProcessor: transcriptProcessor,
+        hookManager: hookManager
     )
 }
 
