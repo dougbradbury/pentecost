@@ -232,8 +232,10 @@ final class AudioDeviceManager {
         }
 
         if T.self == String.self {
-            // For string properties, we need to handle CFString properly
-            var cfString: Unmanaged<CFString>?
+            // For string properties, allocate memory and handle CFString properly
+            let cfStringPtr = UnsafeMutablePointer<CFString?>.allocate(capacity: 1)
+            defer { cfStringPtr.deallocate() }
+            cfStringPtr.initialize(to: nil)
 
             status = AudioObjectGetPropertyData(
                 deviceID,
@@ -241,15 +243,15 @@ final class AudioDeviceManager {
                 0,
                 nil,
                 &propertySize,
-                &cfString
+                cfStringPtr
             )
 
             guard status == noErr else {
                 throw AudioDeviceError.failedToGetPropertyData(status)
             }
 
-            if let cfString = cfString {
-                let string = cfString.takeUnretainedValue() as String
+            if let cfString = cfStringPtr.pointee {
+                let string = cfString as String
                 return string as! T
             } else {
                 return "Unknown" as! T

@@ -342,17 +342,8 @@ func performCleanShutdown(
         remoteAudioEngine.inputNode.removeTap(onBus: 0)
     }
 
-    // Allow brief time for any pending audio processing to complete
-    do {
-        try await Task.sleep(for: .milliseconds(100))
-    } catch {
-        // Sleep interrupted, continue cleanup
-    }
-
-    // Close transcript files and write FINISHED tag
-    await transcriptProcessor?.closeAllFiles()
-
     // Finish transcription in order to properly close Speech framework resources
+    // This allows any pending recognition results to be delivered
     do {
         try await inputEnglishRecognizer.finishTranscribing()
         try await inputFrenchRecognizer.finishTranscribing()
@@ -365,6 +356,17 @@ func performCleanShutdown(
     } catch {
         ui.status("⚠️ Error during transcription cleanup: \(error)")
     }
+
+    // Allow brief time for any final transcription results to be processed
+    do {
+        try await Task.sleep(for: .milliseconds(200))
+    } catch {
+        // Sleep interrupted, continue cleanup
+    }
+
+    // Close transcript files and write FINISHED tag
+    // This must happen AFTER finishTranscribing() to avoid race conditions
+    await transcriptProcessor?.closeAllFiles()
 
     ui.status("✅ Shutdown complete")
 
