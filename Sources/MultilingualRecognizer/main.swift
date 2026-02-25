@@ -305,14 +305,17 @@ func performCleanShutdown(
     transcriptProcessor: TranscriptFileProcessor?,
     hookManager: HookManager?
 ) async {
-    // Execute hooks for transcript end (on shutdown)
+    // Execute hooks for transcript end (on shutdown) - fire and forget
     if let transcriptPath = await transcriptProcessor?.getCurrentTranscriptPath() {
         let context: [String: String] = [
             "transcript_file": transcriptPath,
             "timestamp": ISO8601DateFormatter().string(from: Date()),
             "event": "shutdown"
         ]
-        await hookManager?.executeHooks(event: "on_transcript_end", context: context)
+        // Run hooks in detached task so shutdown doesn't wait
+        Task.detached {
+            await hookManager?.executeHooks(event: "on_transcript_end", context: context)
+        }
     }
     // Clear screen for clean shutdown message display
     print("\u{001B}[2J\u{001B}[H", terminator: "")
