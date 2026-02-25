@@ -177,4 +177,9 @@ actor TranscriptFileProcessor: SpeechProcessor {
         }
         return nil
     }
+
+    func shutdown() async {
+        // Close all files and write FINISHED tag
+        closeAllFiles()
+    }
 }

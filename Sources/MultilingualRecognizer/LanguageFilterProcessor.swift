@@ -116,4 +116,9 @@ final class LanguageFilterProcessor: SpeechProcessor {
             return false
         }
     }
+
+    func shutdown() async {
+        // Propagate shutdown to next processor
+        await nextProcessor.shutdown()
+    }
 }

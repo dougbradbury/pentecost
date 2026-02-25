@@ -1,8 +1,9 @@
 import Foundation
 
 @available(macOS 26.0, *)
-final class BroadcastProcessor: SpeechProcessor {
+actor BroadcastProcessor: SpeechProcessor {
     private let processors: [SpeechProcessor]
+    private var hasShutdown = false
 
     init(processors: [SpeechProcessor]) {
         self.processors = processors
@@ -22,6 +23,21 @@ final class BroadcastProcessor: SpeechProcessor {
                         locale: locale,
                         source: source
                     )
+                }
+            }
+        }
+    }
+
+    func shutdown() async {
+        // Make shutdown idempotent - only run once even if called multiple times
+        guard !hasShutdown else { return }
+        hasShutdown = true
+
+        // Shutdown all processors in parallel
+        await withTaskGroup(of: Void.self) { group in
+            for processor in processors {
+                group.addTask {
+                    await processor.shutdown()
                 }
             }
         }

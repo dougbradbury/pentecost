@@ -95,4 +95,9 @@ final class ArtifactFilterProcessor: SpeechProcessor {
         // Filter if we found a word repeated consecutively more than threshold times
         return maxConsecutiveCount >= repetitionThreshold
     }
+
+    func shutdown() async {
+        // Propagate shutdown to next processor
+        await nextProcessor.shutdown()
+    }
 }

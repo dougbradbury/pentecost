@@ -58,4 +58,9 @@ final class MinimumLengthFilterProcessor: SpeechProcessor {
 
         return words.count
     }
+
+    func shutdown() async {
+        // Propagate shutdown to next processor
+        await nextProcessor.shutdown()
+    }
 }

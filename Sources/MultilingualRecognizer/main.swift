@@ -303,7 +303,9 @@ func performCleanShutdown(
     keyboardMonitorTask: Task<Void, Never>?,
     originalTermios: termios?,
     transcriptProcessor: TranscriptFileProcessor?,
-    hookManager: HookManager?
+    hookManager: HookManager?,
+    localTranslationProcessor: TranslationProcessor,
+    remoteTranslationProcessor: TranslationProcessor?
 ) async {
     // Execute hooks for transcript end (on shutdown) - fire and forget
     if let transcriptPath = await transcriptProcessor?.getCurrentTranscriptPath() {
@@ -357,16 +359,13 @@ func performCleanShutdown(
         ui.status("⚠️ Error during transcription cleanup: \(error)")
     }
 
-    // Allow brief time for any final transcription results to be processed
-    do {
-        try await Task.sleep(for: .milliseconds(200))
-    } catch {
-        // Sleep interrupted, continue cleanup
+    // Shutdown processor chains to allow pending work to complete
+    // This will wait for translations and close transcript files with FINISHED tag
+    ui.status("⏳ Shutting down processors...")
+    await localTranslationProcessor.shutdown()
+    if let remoteTranslationProcessor = remoteTranslationProcessor {
+        await remoteTranslationProcessor.shutdown()
     }
-
-    // Close transcript files and write FINISHED tag
-    // This must happen AFTER finishTranscribing() to avoid race conditions
-    await transcriptProcessor?.closeAllFiles()
 
     ui.status("✅ Shutdown complete")
 
@@ -541,7 +540,9 @@ func main() async {
         keyboardMonitorTask: keyboardMonitorTask,
         originalTermios: originalTermios,
         transcriptProcessor: transcriptProcessor,
-        hookManager: hookManager
+        hookManager: hookManager,
+        localTranslationProcessor: localTranslationProcessor,
+        remoteTranslationProcessor: remoteTranslationProcessor
     )
 }
 
