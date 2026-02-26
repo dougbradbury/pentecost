@@ -58,6 +58,8 @@ Thumbs.db
 # IDEs
 .vscode/
 .idea/
+.claude/
 
 # Documentation builds
 docs/build/
+.claude/
