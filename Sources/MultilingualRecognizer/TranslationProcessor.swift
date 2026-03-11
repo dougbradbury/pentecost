@@ -115,7 +115,7 @@ private actor TranslationTaskTracker {
         pendingCount += 1
         Task {
             await operation()
-            await self.taskCompleted()
+            self.taskCompleted()
         }
     }
 
